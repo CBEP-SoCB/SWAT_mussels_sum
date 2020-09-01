@@ -1,0 +1,22 @@
+Title: Surface Water Ambient Toxics Program Data Notes
+Author: Tyler Walsh
+Date: December 16th, 2019
+
+## Data Access:
+Reports from 2011-2018 were downloaded from this URL: https://www.maine.gov/dep/water/monitoring/toxics/swat/
+
+Data Request Form URL: https://www.maine.gov/dep/maps-data/egad/#eg
+
+It looks like every year has data for 11 metals (Ag, Al, Ar, Cd, Cr, Cu, Fe, Pb, Hg, Ni, Zn) from studies on blue mussels
+and soft shell clams. However, the 2017/2018 study looked at Se instead of Zn, in soft shell clams. Every year has data
+for PAHs & PCBs. All years have data for PFCs, except for 2012 and 2013, which has various pesticide data instead. Sites vary
+throughout the years, and sampling PAHs/PCBs/PCFs/pesticides will sometimes be with both blue mussels and soft shell clams, and
+sometimes one or the other -- depending on the year. 
+
+Date Noted: December 16th, 2019
+
+
+Data appears to be different than the Gulfwatch and the Mussel Watch Program data. According to the 2011 report,
+data is compared to the Gulfwatch data.
+
+Date Noted: December 17th, 2019

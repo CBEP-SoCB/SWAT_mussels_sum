@@ -1,0 +1,26 @@
+Compound, Toxicity Equivalency Factor (TEF)
+1-MethylNaphthalene,0
+1-MethylPhenanthrene,0
+2-MethylNaphthalene,0
+"2,3,5-TriMethylNaphthalene",0
+"2,6-DiMethylNaphthalene",0
+Acenaphthene,0.001
+Acenaphthylene,0.001
+Anthracene,0.01
+Benzo(a)Anthracene,0.1
+Benzo(a)Pyrene,1
+Benzo(b)Fluoranthene,0.1
+Benzo(b+k)fluoranthene,0.1
+Benzo(e)Pyrene,0
+"Benzo(g,h,i)Perylene",0.01
+Benzo(k)Fluoranthene,0.1
+Biphenyl,0
+Chrysene,0.01
+"Dibenzo(a,h)Anthracene",5
+Fluoranthene,0.001
+Fluorene,0.001
+"Indeno(1,2,3-cd)Pyrene",0.1
+Naphthalene,0
+Perylene,0
+Phenanthrene,0.001
+Pyrene,0.001

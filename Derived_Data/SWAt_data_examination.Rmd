@@ -1,0 +1,96 @@
+---
+title: "Maine DEP EGAD Mussel tissue Toxics Data"
+author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
+date: "8/30/2020"
+output:
+  github_document:
+    toc: true
+    fig_width: 7
+    fig_height: 5
+---
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+
+```{r load_libraries}
+library(tidyverse)
+library(readxl)
+
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set
+
+library(LCensMeans)
+```
+# Load Data
+## Establish Folder Reference
+```{r folder_refs}
+sibfldnm <- 'Original_Data'
+parent   <- dirname(getwd())
+sibling  <- file.path(parent,sibfldnm)
+niecefn = 'SWAT'
+niece = file.path(sibling, niecefn)
+fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
+```
+
+This is a larger data file that takes soem time to load.  Getting the column types right dramatically improves load speed. Much of the data is qualitative, and can't be handled in R
+```{r}
+SWAT_data <- read_excel(file.path(niece, fn), 
+    sheet = "Mussels Data", col_types = c("numeric", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "date", "text", "text", 
+        "text", "date", "text", "numeric", 
+        "text", "text", "text", "text", 
+        "text", "numeric", "numeric", "text", 
+        "text", "text", "text", "text", 
+        "text", "numeric", "text", 
+        "text", "text", "text", "text", 
+        "text", "text", "text"))
+```
+
+We need to deal with data reported in multiple different sets of units.  We need interconversion factors....
+
+```{r}
+unique(SWAT_data$`UNITS VALUE`)
+```
+
+So, conversion factors based on left of '/' and right of '/'
+
+BASed on mg/g as basic 
+
+
+```{r}
+knitr::kable(xtabs(~PARAMETER+`UNITS VALUE`, data  = SWAT_data))
+```
+So, lipids, moisture and solids are in percent
+metals are in mg/g
+Sample weight is in g
+most organic contaminants are in ng/kg or pg/g
+Some metals data in UG/G
+
+So. lets put everything in ug/g
+```{r}
+mytxt <- 'abbrev, times
+"G", NA
+"MG/KG", 1
+"NG/G", .001
+"NG/KG", .000001
+"PG/G",  1000000
+"UG/KG", 1000
+"UG/G",  1
+"TRUE/FALSE", NA
+"%", NA'
+
+conversions <- read.csv(text = mytxt)
+```
+
+```{r}
+knitr::kable(xtabs(~ PARAMETER + `WEIGHT BASIS`, data = SWAT_data))
+```
+
+
+Examination of data shows some parameters are reported on a wet weight, dry weight, and a lipid basis.
+
