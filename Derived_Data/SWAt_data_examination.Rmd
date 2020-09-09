@@ -1,10 +1,12 @@
 ---
-title: "Maine DEP EGAD Mussel tissue Toxics Data"
+title: "Maine DEP EGAD Mussel Tissue Toxics Data"
+subtitle: "Initial Data Review"
 author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
-date: "8/30/2020"
+date: "9/10/2020"
 output:
   github_document:
     toc: true
+    toc_depth: 2
     fig_width: 7
     fig_height: 5
 ---
@@ -14,9 +16,39 @@ output:
   style="position:absolute;top:10px;right:50px;" />
 
 
+# Introduction
+Maine's Department of Environmental Protection (DEP) maintains a large database
+of environmental data called "EGAD".  Citizens can request data from the
+database through DEP staff.
+
+CBEP requested data from DEP on levels of toxic contaminants in shellfish
+tissue samples from Casco Bay. The result is a large (> 100,000 line) excel
+spreadsheet containing data from about 40 sampling dates from 20 locations, over
+a period of more than 15 years.
+
+Unfortunately, the data delivery contains little metadata, so it takes some
+effort to understand the data format and analyze it correctly. Among other
+problems, we need to understand dates and locations of samples, what analytes
+were used for different samples, etc.
+
+In this notebook we take various slices through the data to understand its
+structure. It is a long notebook, because htere was a lot to examine.  However
+the functional core of hte notebook lies in creation of cleaned data sets.
+
+sample_spatial.csv
+sites_spatial.csv
+Parameter List.csv
+
+While those data sets ARE produced in this notebook, WE plan to produce a
+simpler version that skips all the data exploraiton.
+
+# Load Libraries
+
 ```{r load_libraries}
 library(tidyverse)
 library(readxl)
+library(htmltools)  # used by knitr called here only to avoid startup text later in document
+library(knitr)
 
 library(CBEPgraphics)
 load_cbep_fonts()
@@ -30,14 +62,15 @@ library(LCensMeans)
 sibfldnm <- 'Original_Data'
 parent   <- dirname(getwd())
 sibling  <- file.path(parent,sibfldnm)
-niecefn = 'SWAT'
-niece = file.path(sibling, niecefn)
 fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
 ```
 
-This is a larger data file that takes soem time to load.  Getting the column types right dramatically improves load speed. Much of the data is qualitative, and can't be handled in R
+## Copy Data
+This is a larger data file that takes some time to load.  Getting the column
+types right dramatically improves load speed. Much of the data is qualitative,
+and can't be handled in R.
 ```{r}
-SWAT_data <- read_excel(file.path(niece, fn), 
+SWAT_data <- read_excel(file.path(sibling, fn), 
     sheet = "Mussels Data", col_types = c("numeric", 
         "text", "text", "text", "text", "text", 
         "text", "text", "text", "text", "text", 
@@ -51,7 +84,848 @@ SWAT_data <- read_excel(file.path(niece, fn),
         "text", "text", "text"))
 ```
 
-We need to deal with data reported in multiple different sets of units.  We need interconversion factors....
+# Exploration of Data Codes
+## Uninformative Codes
+### What is Sample_ID
+The SAMPLE_ID itself appears to be a combination of other information, including
+* A site Code
+* A current sample point name, and
+* Sometimes a YEAR
+* Sometimes a method qualifier, like "DIOXIN"
+
+That "DIOXIN" qualifier is unique to "MEPH" samples, which, based on the
+similarity of the site codes used,  appear to be 2003 Gulfwatch samples. Data
+post 2000 are not available online through the Gulfwatch website.  In the EGAD
+data, they are associated with the  "FORE RIVER OUTER" location.
+
+```{r}
+SWAT_data %>%
+  filter(grepl('DIOXIN', SAMPLE_ID)) %>%
+         select(SAMPLE_ID, EGAD_SITE_NAME) %>%
+         unique() %>% arrange(SAMPLE_ID)
+```
+
+So, it looks like a unique sample identifier combines a LOT of  info.
+
+### What is `SAMPLE TYPE`
+```{r}
+unique(SWAT_data$`SAMPLE TYPE`)
+```
+```{r}
+as.data.frame(xtabs(~PARAMETER + `SAMPLE TYPE` , data = SWAT_data)) %>%
+  filter(SAMPLE.TYPE == 	'PHYSICAL CHARACTERISTIC' & Freq > 0)
+```
+So the ONLY parameter ever included under 'PHYSICAL CHARACTERISTIC' is the species of shellfish sampled.  This variable conveys no independent information, and so is of little use.
+
+### What is `SAMPLE POINT TYPE`?
+```{r}
+unique(SWAT_data$`SAMPLE POINT TYPE`)
+
+```
+`SAMPLE POINT TYPE` contains only a single value, so in our context, it is useless.  
+
+
+
+
+### What is `SAMPLE LOCATION`?
+```{r}
+unique(SWAT_data$`SAMPLE LOCATION`)
+```
+
+Again, no useful information here...
+
+
+### What is `SAMPLE LOCATION`?
+```{r}
+unique(SWAT_data$`SAMPLE LOCATION`)
+```
+
+### What is `RESULT TYPE`?
+```{r}
+unique(SWAT_data$`RESULT TYPE`)
+```
+
+```{r}
+SWAT_data %>% select(`RESULT TYPE`, PARAMETER) %>% filter(`RESULT TYPE`=="PHYSICAL MEASUREMENT")
+```
+So that is uninformative too.  It mirrors SAMPLE TYPE.
+
+### What is `PARAMETER_QUALIFIER`?
+```{r}
+unique(SWAT_data$`PARAMETER_QUALIFIER`)
+```
+
+### What are `PARAMETER FILTERED` and `SAMPLE FILTER`?
+```{r}
+xtabs(~ `PARAMETER FILTERED` + `SAMPLE FILTER`, data = SWAT_data, addNA = TRUE)
+```
+SO both are uninformative.
+
+
+### What are `DEPTH` and `DEPTH UNITS`?
+```{r}
+xtabs( ~ DEPTH + `DEPTH UNITS`, data = SWAT_data, addNA = TRUE)
+```
+### What is `TREATMENT`?
+```{r}
+unique(SWAT_data$`TREATMENT`)
+```
+### What is `METER_CALIBRATED`?
+```{r}
+unique(SWAT_data$`METER_CALIBRATED`)
+```
+
+## Possibly Informative Codes
+
+### What is `CURRENT_SAMPLE_POINT_NAME`?
+```{r}
+as.tibble(xtabs(~SWAT_data$`CURRENT_SAMPLE_POINT_NAME`, addNA = TRUE)) %>%
+  rename_at(c(1), ~'SPoint1')
+```
+These names appear meaningful.  They are used consistently to distinguish among
+samples, and are connected to the spatial data, but SAMPLE POINT names are not
+unique, and can be duplicated between different sites or within one Sites in
+different years.  See the discussion of Sites and spatial data, below.
+
+
+### What is `PREP METHOD`?
+```{r}
+unique(SWAT_data$`PREP METHOD`)
+```
+So, useful info, if I knew what the codes mean.
+
+
+### What is `SAMPLE COLLECTION METHOD`?
+```{r}
+unique(SWAT_data$`SAMPLE COLLECTION METHOD`)
+```
+#### Does `SAMPLE COLLECTION METHOD` Break Out by Parameter?
+```{r}
+xtabs(~PARAMETER + `SAMPLE COLLECTION METHOD`, data = SWAT_data) %>%
+  as.tibble() %>%
+  pivot_wider(id_cols = PARAMETER,
+              names_from = `SAMPLE COLLECTION METHOD`,
+              values_from = n) %>%
+  arrange(`COMPOSITE SAMPLE`, `PARAMETER`)
+```
+So, other than the fact that many of the pesticide data are derived only from
+composite samples, and some PCBs (by chemical name) appear only from 'hand picked'
+samples, it appears that these represent different sampling strategies, or at least
+different labels for sample collection strategies employed during sample collection.
+
+Curiously, the species identification 'Mytilus edulis' is only included in the
+'COMPOSITE SAMPLE' category 7 times, MUCH less frequently than some other
+parameters.  That appears counter-intuitive. How can we have more samples for
+some parameters than samples of mussels?  something here is inconsistent.
+
+#### Does `SAMPLE COLLECTION METHOD` Break Out by Site?
+```{r}
+xtabs(~EGAD_SITE_NAME + `SAMPLE COLLECTION METHOD`, data = SWAT_data) %>%
+  as.tibble() %>%
+  pivot_wider(id_cols = EGAD_SITE_NAME,
+              names_from = `SAMPLE COLLECTION METHOD`,
+              values_from = n)
+```
+Almost.  with a few exceptions, all or almost all data from each site is flagged one way or the other.
+
+#### Does `SAMPLE COLLECTION METHOD` Break Out by Date?
+```{r}
+xtabs(~SAMPLE_DATE + `SAMPLE COLLECTION METHOD`, data = SWAT_data) %>%
+  as.tibble() %>%
+  pivot_wider(id_cols = SAMPLE_DATE,
+              names_from = `SAMPLE COLLECTION METHOD`,
+              values_from = n)
+```
+Again, ALMOST all amples from each date are flagged one way or the other.
+
+#### When is "HAND PICKED" used?
+But how can we figure out what these sample collection methods mean?  We know
+the Sample_Collection_Method for Gulfwatch was a composite of 20 mussels.
+Gulfwatch used the sample code "MEPH for a site in "Portland Harbor". The
+related EGAD_SITE_NAME is 'FORE RIVER OUTER - CBFROR'.
+
+```{r}
+SWAT_data %>% filter(EGAD_SITE_NAME== 'FORE RIVER OUTER - CBFROR') %>%
+  select(c(2, 13, 4, 7, 8)) %>%
+  unique()
+```
+
+#### Conclusion -- This is Confusing
+
+This is confusing -- it's not clear what the different sample collection codes
+mean.  THey clearly segregate to some extent by sample events, but it appears
+not entirely.
+
+### What are `LAB QUALIFIER` and `VALIDATION QUALIFIER`?
+
+```{r}
+SWAT_data %>% select(`LAB QUALIFIER`,`VALIDATION QUALIFIER`, `QUALIFIER DESCRIPTION`) %>% unique() %>% kable()
+```
+
+So it looks like the second qualifier is a subset of the first.
+
+```{r}
+xtabs(~`LAB QUALIFIER` + `VALIDATION QUALIFIER`, data = SWAT_data, addNA = TRUE)
+```
+Interestingly, relatively few of the LAb Qualifiers were pulled out in the
+Validation Qualifiers. Why?
+
+### What is `WEIGHT BASIS`?
+```{r}
+unique(SWAT_data$`WEIGHT BASIS`)
+```
+We'd like to see if these are present for all parameters
+```{r}
+xtabs(~ PARAMETER + `WEIGHT BASIS`, data = SWAT_data, addNA = TRUE)
+```
+
+### What is `DILUTION FACTOR`?
+```{r}
+xtabs(~SWAT_data$`DILUTION_FACTOR`)
+```
+
+
+# Sites
+## List of Sites
+Note that we pull apart the site name into a site code and a longer name.
+```{r}
+sites <- SWAT_data %>%
+  select(`SITE SEQ`, `EGAD_SITE_NAME`) %>%
+  group_by(`SITE SEQ`, `EGAD_SITE_NAME`) %>%
+  summarize(SiteCode =  first(sub('.* - ','', `EGAD_SITE_NAME`)), 
+            Site =  first(sub(' - .*','', `EGAD_SITE_NAME`)),
+                        .groups = 'drop') %>%
+  select(-`EGAD_SITE_NAME`)
+#write_csv(sites, 'cb_SWAT_sites_list.csv')
+kable(sites)
+```
+
+We can check that the results are unique:
+```{r}
+any(duplicated(sites$`SITE SEQ`))
+any(duplicated(sites$SiteCode))
+any(duplicated(sites$Site))
+```
+
+
+## Match Sites with Geographic Locations
+In addition to the toxics data, we received a separate Excel file containing
+geospatial data.  That data includes repeat geographic data for each site,
+apparently providing more information on separate sample collection events.  As
+far as we have been able to tell, however, there is no consistent sample
+identifier between the geographic data and toxics data as received.
+
+Here we reduce the spatial data to data on each nominal sampling location, and
+check that we have geographic data for each site.  As is often the case, we lack
+precise metadata on geographic coordinates. We do know locations were collected
+in most cases with hand-held GPS units, which suggests lat-long data are
+probably in WGS 1984.
+
+We will need to return to the spatial data later to see whether sampling events
+have slightly different nominal sampling locations from their reported sites.
+
+
+```{r}
+fn <- 'CascoBay_SWAT_Spatial.xlsx'
+samples_spatial_data <- read_excel(file.path(sibling, fn))%>%
+  mutate(`SITE UTM X` = as.numeric(`SITE UTM X`),
+         `SITE UTM Y` = as.numeric(`SITE UTM Y`),
+         `SITE LATITUDE` = as.numeric(`SITE LATITUDE`),
+         `SITE LONGITUDE` = as.numeric(`SITE LONGITUDE`),
+         `SAMPLE POINT UTM X` = as.numeric(`SAMPLE POINT UTM X`),
+         `SAMPLE POINT UTM Y` = as.numeric(`SAMPLE POINT UTM Y`),
+         `SAMPLE POINT LATITUDE` = as.numeric(`SAMPLE POINT LATITUDE`),
+         `SAMPLE POINT LONGITUDE` = as.numeric(`SAMPLE POINT LONGITUDE`),
+  )
+
+sites_spatial_data <- samples_spatial_data  %>%
+  rename(SITESEQ = `SITE SEQ`) %>%
+    group_by(SITESEQ) %>%
+    summarize(SITECODE  = first(sites$SiteCode[match(SITESEQ, sites$`SITE SEQ`)]),
+              SITE  = first(sites$Site[match(SITESEQ, sites$`SITE SEQ`)]),
+              UTM_E = first(`SITE UTM X`),
+              UTM_N = first(`SITE UTM Y`),
+              LAT   = first(`SITE LATITUDE`),
+              LONG  = first(`SITE LONGITUDE`),
+              .groups = 'drop') 
+kable(sites_spatial_data)
+#rm(sites)
+```
+```{r}
+sum(! is.na(sites_spatial_data$SITE))
+```
+So, they're all there. Presumably the other sites have samples of other
+shellfish (in the second tab of the source Excel File).
+
+## Write CSV files
+```{r}
+write_csv(sites_spatial_data, 'sites_spatial.csv')
+```
+
+ArcGIS was having trouble reading this file, so we try to simplify here.
+Especially by simplifying column names (removing spaces) and removing NAs.
+Without this step, NAs were forcing ArcGIS to interpret these data columns
+as text.
+```{r} 
+samples_spatial_data %>%
+  select ( -`SITE UTM X`, -`SITE UTM Y`, -`SITE LATITUDE`, -`SITE LONGITUDE`,
+           - DATA_SOURCE, -LOCATION_ACCURACY, -LOCATION_METHOD) %>%
+  rename_all(~gsub(' ', '', .)) %>%
+  write_csv('samples_spatial.csv', na = '')
+```
+
+# Sample Points
+Many Sites  have more than one SAMPLE POINTs.  The SAMPLE POINTs appear
+to be actual sampling locations, each associated with a nominal site.
+Unfortunately, recording of actual sampling locations appears inconsistent
+with real (i.e., not identical) Sample Pt data not available from earlier
+sample years, but typically collected more frequently since.
+
+## Examine Distances between Site and Sample Points
+```{r}
+a <- samples_spatial_data %>%
+  select(`SITE SEQ`, CURRENT_SITE_NAME, `SITE UTM X`, `SITE UTM Y`,
+         `SAMPLE POINT NAME`, `SAMPLE POINT SEQ`,
+         `SAMPLE POINT UTM X`,`SAMPLE POINT UTM Y`) %>%
+  mutate(SiteCode =  sub('.* - ','', `CURRENT_SITE_NAME`)) %>%
+  mutate(d = sqrt((`SAMPLE POINT UTM X` -`SITE UTM X`)^2 + 
+                  (`SAMPLE POINT UTM Y` -`SITE UTM Y`)^2)) %>%
+  group_by(`SiteCode`) %>%
+  summarize(sitex    = first(`SITE UTM X`),
+            sitey    = first(`SITE UTM Y`),
+            maxx    = round(max(abs(`SAMPLE POINT UTM X` - `SITE UTM X`)),2),
+            maxy    = round(max(abs(`SAMPLE POINT UTM Y` - `SITE UTM Y`)),2),
+            maxd    = round(max(d), 2),
+            n = n(),
+            .groups = 'drop') %>%
+  select(-sitex, -sitey)
+kable(a, col.names = c('Site', 'Max X Distance', 'Max Y Distance', 'Maximum Distance From Site', 'N'))
+```
+## Map Visualization
+Several  Sites show (unreasonable?) large differences between Sample Points
+and nominal Site locations.  To make sense of this, we mapped Sites and 
+Sample Points in Arc GIS.
+! [Map of SWAT Sampling Locations and Nominal Sites](SWAT_Toxics_Locations.jpg)
+The map shows clearly that sites are general areas, not the exact locations where samples were
+collected. IN most cases, the distances are trivial on a map of this scale, but not always.
+
+*  **CBBBBB -- Back Bay**:  Do not appear to be typos, but exact locations do not appear to
+   have been collected in all years.  Samples appearto have ben collected from various locations
+   along the Back Bay Shoreline.  
+   identical for all samples.  Locations in Samples in 2015 all fairly consistent,
+   but differ slightly.    
+*  **CBHWNP -- Harpswell Navy Pier**:  Multiple samples from each of two years, were given
+   identical GPS coordinates.  The two locations are some distance apart.  
+*  **CBMBBR  -- Brunswick Mare Brook**:  States positions from 2015 only accurate to 1000m.
+   but they look better. Sampling Points are spread out along the shoreline and the nominal
+   Site location is not all that close to most of them, but is located bayward of them.
+*  **CBPRES --  Presumpscot River East** -- Sample Points along shore, East shore.  
+*  **CBPRWS --  Presumpscot River West** -- Sample Points along shore, West shore.  
+*  **CBPRM* --  Presumpscot River Mouth** -- Sample Points along shore, BOTH shores.  
+
+
+# Sampling Dates
+## Dates and Sites Provide Unique Sampling Events, But Not Unique Samples
+From a practical point of view, it's likely we have unique sampling events --
+possibly including multiple locations or multiple replicates within locations --
+on each sampling date.
+
+```{r}
+dates_data <- SWAT_data %>%
+  select(SAMPLE_DATE, `EGAD_SITE_NAME`) %>%
+  group_by(`EGAD_SITE_NAME`, `SAMPLE_DATE`) %>%
+  summarize(Code =  first(sub('.* - ','', `EGAD_SITE_NAME`)), 
+            Site =  first(sub(' - .*','', `EGAD_SITE_NAME`)),
+            Year =  first(as.numeric(format(SAMPLE_DATE,'%Y'))),
+                        .groups = 'drop') %>%
+  rename(Date = SAMPLE_DATE) %>%
+  select(Code, Site, Year, Date) %>%
+  arrange(Year, Date)
+kable(dates_data)
+```
+
+That Suggests we have FORTY unique sampling dates and locations  Note that there
+are several times that we have multiple sites sampled in a given date, and several
+times that the same site is sampled multiple times in the same year.
+
+## Period of Data
+
+```{r}
+range(dates_data$Year)
+
+```
+
+## How Many Sampling Events Each Year?
+```{r}
+dates_data %>%
+  group_by(Year,Date) %>%
+  summarize(Date = first(Date), .groups = 'drop_last') %>%
+  summarize(count = n())
+```
+
+
+## How Many Times has Each Site Been Sampled?
+```{r}
+dates_data %>%
+  group_by(Site, Year) %>%
+  mutate(count = n())  %>%
+  ungroup() %>%
+  group_by(Site) %>%
+  summarize(spread = range(Year)[[2]]-range(Year)[[1]] + 1,
+            nsamps = n(),
+            maxsamps = max(count),
+            .groups = 'drop') %>%
+  kable(col.names = c('Site',
+                      'Period between First and Last Samples (Years)',
+                      'Total Number of Sampling Events',
+                      'Maximum Number of Samples in One Year'))
+```
+So, there are basically TWO sites which have been sampled fairly regularly,
+and a handful of sites sampled more than twice.  Trend analysis
+may be possible looking at:  
+*  Mare Brook      (three times over ten years)  
+*  East End Beach  (six times over eleven years)  
+*  Mill Creek      (Six Times over twelve years)  
+*  Spring Point    (four times over nine years)
+
+Notice that the Fore River Outer site was sampled three times in one year.
+
+
+# Creating a Unique ID for Sampling Events
+Ideally, we want to be able to uniquely identify samples, so we know when and
+where each sample was collected, and what data is associated with a single
+sampling event.  It appears that the most likely data field to convey that
+information is the "SAMPLE_ID" field.  If that is correct, it should correspond
+to unique combinations of some, or most of:
+
+*  SITE SEQ / EGAD_SITE_NAME
+*  CURRENT_SAMPLE_POINT_NAME
+*  SAMPLE POINT TYPE
+*  SAMPLE COLLECTION METHOD
+*  SAMPLE TYPE
+*  SAMPLE_DATE
+
+We can test that as follows:
+
+```{r}
+SWAT_data %>%
+  group_by(SAMPLE_ID) %>%
+  summarize(nsites    = length(unique(`SITE SEQ`)),
+            nsamppt   = length(unique(`CURRENT_SAMPLE_POINT_NAME`)),
+            npttypes  = length(unique(`SAMPLE POINT TYPE`)),
+            nmeth     = length(unique(`SAMPLE COLLECTION METHOD`)),
+            nsamptype  = length(unique(`SAMPLE TYPE`)),
+            ndates    = length(unique(`SAMPLE_DATE`)),
+            .groups = 'drop') %>%
+  summarize_at(vars(nsites:ndates), max)
+
+```
+
+From that we can see that SAMPLE_ID is tied to unique 
+*  SITE SEQ / CURRENT_SITE_NAME / Code
+*  CURRENT_SAMPLE_POINT_NAME
+*  SAMPLE POINT TYPE
+
+But NOT to unique 
+*  SAMPLE COLLECTION METHOD
+*  SAMPLE TYPE
+*  SAMPLE_DATE
+
+It is possible that multiple sample types might be collected during a single
+site visit, with each sent off to different laboratories (for example).  So the
+most troubling of these is the date.  We check if the combination of SAMPLE_ID
+and SAMPLE_DATE provides unique information.
+
+
+## What Timestep Provides Unique Sample Identifiers
+It would be nice to be able to make a unique sample ID code that does not depend
+on the full date.  We know we have multiple samples collected at single sites in
+a few years, but I don't know if they had the same SAMPLE_ID.
+ 
+```{r}
+SWAT_data %>%
+  group_by (SAMPLE_ID,SAMPLE_DATE) %>%
+  summarize(SAMPLE_ID = first(SAMPLE_ID),
+            SAMPLE_DATE = first(SAMPLE_DATE),
+            year  = as.numeric(format(SAMPLE_DATE, '%Y')),
+            month = as.numeric(format(SAMPLE_DATE, '%m')),
+            day = as.numeric(format(SAMPLE_DATE, '%d')),
+            .groups = 'drop') %>%
+  # Count SAMPLE_ID on each day (they are unique)
+  group_by (SAMPLE_ID, year, month, day) %>%
+  mutate   (Ddates = sum(! is.na(SAMPLE_DATE))) %>%
+  ungroup  () %>% 
+  # Count SAMPLE_ID by month -- and keep the highest daily total
+  group_by (SAMPLE_ID, year, month) %>%
+  mutate   (maxDdates = max(Ddates),
+            Mdates = sum(! is.na(SAMPLE_DATE))) %>%
+  select(-Ddates) %>%
+  ungroup() %>%
+  # Count SAMPLE_ID by year -- and keep the highest daily and monthly totals
+  group_by(SAMPLE_ID, year) %>%
+  mutate(maxDdates = max(maxDdates),
+         maxMdates = max(Mdates),
+         Ydates = sum(! is.na(SAMPLE_DATE))) %>%
+  select (-Mdates) %>%
+  ungroup() %>%
+  # Roll results up into a single row tibble
+  summarize(maxDdates = max(maxDdates),
+            maxMdates = max(maxMdates),
+            maxYdates = max(Ydates),
+            .groups = 'drop')
+```
+
+## Demonstrate The Logic
+It turns out SAMPLE_ID is not unique within years, or even within years and
+months.  To get to a unique combination, we must include the day as well.  On
+the other hand, we never have more than two sample dates at any SAMPLE_ID in a
+year.  If we could figure out which is which, we could use the year and a
+sequence number as a unique ID.
+
+But it turns out, we can do better, and make the year and date codes consistent
+across all samples collected in a given year. We never see  more than a few
+sample dates within a year (at all locations), so we can code each sample date
+as a year plus a digit between one and three.
+
+A slightly roundabout way to convert from dates to sequence numbers is to use
+as.numeric(factor(.)).
+
+Here's the logic, looking only as SAMPLE_ID_and DATES
+```{r}
+tmp <- SWAT_data %>%
+  group_by  (SAMPLE_ID,SAMPLE_DATE) %>%
+  summarize (SAMPLE_ID = first(SAMPLE_ID),
+             SAMPLE_DATE = first(SAMPLE_DATE),
+             .groups = 'drop') %>%
+  mutate    (Year  = as.numeric(format(SAMPLE_DATE, '%Y'))) %>%
+  mutate    (sample_id = gsub(" ", "_", SAMPLE_ID)) %>%
+  group_by  (Year) %>%
+  mutate    (tag = as.numeric(factor(SAMPLE_DATE))) %>%
+  ungroup   ()  %>%
+  mutate    (code = paste(sample_id, Year, tag, sep = '_')) %>%
+  select    (-sample_id) %>%
+  arrange(Year, SAMPLE_ID)
+tmp
+```
+So, other than really ugly unique sample idnetifiers, we've got a useful solution.
+
+### A Quick Test
+Confirm that we now have unique codes:
+```{r}
+tmp %>% group_by(code) %>%
+  summarize(n = length(unique(SAMPLE_ID,SAMPLE_DATE)),
+            .groups = 'drop') %>%
+  summarize(maxtimes = max(n))
+```
+
+## Calculate Unique Sample Codes and Simplify the Data
+Now, we can add that logic (and our earlier lessons about uninformative data
+codes) to the original data set.
+```{r}
+SWAT_simplified <- SWAT_data %>%
+  # Eliminate uninformative identifiers
+  select    (-`SAMPLE TYPE`, -`SAMPLE POINT TYPE`, -`SAMPLE LOCATION`,
+             -`RESULT TYPE`, -`PARAMETER_QUALIFIER`, -`PARAMETER FILTERED`,
+             -`SAMPLE FILTER`, -`DEPTH`, -`DEPTH UNITS`,
+             -TREATMENT, -`METER_CALIBRATED`) %>%
+  
+  # Eliminate data we will not analyze
+  select    (-SITE_DESCRIPTION, -ANALYSIS_DATE,
+             -`QC TYPE`, -SAMPLED_BY, -`UNITS DESCRIPTION`,
+             -`SAMPLE COMMENT`, -`LAB COMMENT`, -`VALIDATION COMMENT`) %>%
+  
+  # Create Site Code and Site Name
+  mutate    (SiteCode =  first(sub('.* - ','', `EGAD_SITE_NAME`)), 
+             Site =  first(sub(' - .*','', `EGAD_SITE_NAME`))) %>%
+  select(-EGAD_SITE_NAME) %>%
+  
+  # Create Year Time Stamp and (Draft 1) Unique Sample ID
+  mutate    (Year  = as.numeric(format(SAMPLE_DATE, '%Y')),
+             sample_id = gsub(" ", "_", SAMPLE_ID)) %>%
+  group_by  (Year) %>%
+  mutate    (tag = as.numeric(factor(SAMPLE_DATE))) %>%
+  ungroup   ()  %>%
+  mutate    (code = paste(sample_id, Year, tag, sep = '_')) %>%
+  select    (-sample_id, -tag) %>%
+  select(`SITE SEQ`, SiteCode, Site, Year, SAMPLE_DATE, SAMPLE_ID, code, everything())
+SWAT_simplified
+```
+
+### Check Uniqueness
+```{r}
+SWAT_simplified %>%
+  select(c(SiteCode, CURRENT_SAMPLE_POINT_NAME,
+           `SAMPLE COLLECTION METHOD`,
+           SAMPLE_DATE, `TEST METHOD`, code)) %>%
+  group_by(code) %>%
+  summarize(nsites    = length(unique(`SiteCode`)),
+            ndates    = length(unique(`SAMPLE_DATE`)),
+            nsamppt   = length(unique(`CURRENT_SAMPLE_POINT_NAME`)),
+            nmeth     = length(unique(`SAMPLE COLLECTION METHOD`)),
+            .groups = 'drop') %>%
+  kable()
+
+```
+So, that works -- Each code has only one site, date and sample_ID.  Some of those codes are annoyingly long, because they are constructed from long subcomponents, but they are unique....
+
+# Do We Get Replicate or Duplicate Parameter Values?
+Now that we have designations fdor single sampling events ( locations / dates / replicates) we can ask whether we get either duplicate data entries or replicates.
+## Check for Duplicates
+```{r}
+tmp <- SWAT_simplified %>%
+  select(c(`SITE SEQ`, SAMPLE_DATE, SiteCode, CURRENT_SAMPLE_POINT_NAME,
+           code, PARAMETER, `WEIGHT BASIS`, CONCENTRATION)) %>%
+  group_by(`SITE SEQ`, SAMPLE_DATE, code, PARAMETER, `WEIGHT BASIS`) %>%
+  summarize(nvals     = sum(!is.na(CONCENTRATION)),
+            .groups = 'drop') %>%
+  filter(nvals > 1)
+  nrow(tmp[,1])
+```
+
+Wow!  We have duplicate values for ALMOST ALL combinations of samples and parameters.  That was a surprise. 
+
+```{r}
+head(tmp)
+```
+### Why Does Duplication or Replication Occur?
+
+### A Couple of Examples
+Lets look at a few of the apparent duplicates and see if we can figure out where the duplication occurs.
+
+```{r}
+SWAT_simplified %>% 
+  filter(code == 'CBBBBB_REP_1_2006_4', PARAMETER == "2,4'-DDD" |
+           PARAMETER == "2,4'-DDE" | PARAMETER == "2,4'-DDT")
+```
+So, duplication arose here because of designation to different analysis labs.
+Some samples are allocated to "AXYS ANALYTIC SERVICES", and some to "PACE
+ANALYTICAL", but reported concentrations are identical, which is unlikely for
+different laboratories.
+
+##  Identical Values Different Labs?
+
+```{r}
+tmp <- SWAT_simplified %>% select(code, `SITE SEQ`, SAMPLE_DATE, PARAMETER,
+                           `ANALYSIS LAB`, `ANALYSIS_LAB_SAMPLE_ID`, CONCENTRATION,
+                           `WEIGHT BASIS`) %>%
+  filter(`WEIGHT BASIS` == 'WET') %>%
+  group_by(`SITE SEQ`, SAMPLE_DATE, code, `ANALYSIS LAB`, PARAMETER) %>%
+  summarise(n = n(),
+            m = mean(CONCENTRATION, na.rm=TRUE),
+            d = max(CONCENTRATION) - min(CONCENTRATION),
+            .groups = 'drop') %>%
+  filter(n>1 & d==0)
+tmp %>% nrow()
+tmp %>% pull(n) %>% range()
+
+ 
+```
+So, even separated by analysis lab, we see several thousand duplicates values.
+To figure out why, we need to look at individual cases in the original data.
+
+```{r}
+tmp <- SWAT_data %>%
+  filter(`WEIGHT BASIS` == 'WET') %>%
+  group_by(`SITE SEQ`, SAMPLE_DATE, SAMPLE_ID, PARAMETER, `ANALYSIS LAB` ) %>%
+  mutate(n = n(),
+         m = mean(CONCENTRATION, na.rm=TRUE),
+         d = max(CONCENTRATION) - min(CONCENTRATION)) %>%
+  filter(n>1 & d==0)
+tmp %>% nrow()
+tmp %>%  pull(n) %>% range()
+
+```
+```{r}
+head(tmp,6)
+```
+Note that the first three are identical.  The second three are NEARLY identical, but have a different CAS number,a dn the chemical name differ only by the absence of an apostrophe after the 6.  By looking on PubChem, that tiny difference in nomenclature implies the sixth chlorine is attached to a different benzene ring.
+
+But we still have three unexplained duplicates of each of those values.
+
+Could we find a way to test that multiple values on idividual samples match?
+
+
+## Are ALL Replicates explained as Laboratory QA/QC Checks?
+
+WE define a replicate as a different observation.  While it is possible for two observations to come up as identical,   there is some risk here of overlooking real 
+Laboratory duplicates are coded by `ANALYSIS_LAB_SAMPLE_ID`. We can
+search for entries where with all the sample and lab analysis ID information included, we still
+get more than one sample
+ 
+```{r}
+SWAT_simplified %>% select(code, `SITE SEQ`, SAMPLE_DATE, PARAMETER,
+                           `ANALYSIS LAB`, `ANALYSIS_LAB_SAMPLE_ID`, CONCENTRATION,
+                           `WEIGHT BASIS`) %>%
+  filter(`WEIGHT BASIS` == 'WET') %>%
+  group_by(`SITE SEQ`, SAMPLE_DATE, code, PARAMETER, `ANALYSIS LAB`,`ANALYSIS_LAB_SAMPLE_ID`) %>%
+  summarise(n = n(),
+            m = mean(CONCENTRATION, na.rm=TRUE),
+            d = max(CONCENTRATION) - min(CONCENTRATION),
+            .groups = 'drop') %>%
+  filter(n>1 & d>0)
+```
+So, here we have DO have entries with multiple samples even from single labs and
+single lab sample IDs, but they are all WEIGHTS. We don't need to deal with
+WEIGHTS directly coming from different lab analyses - - that is, they are
+laboratory duplicates.
+
+```{r}
+SWAT_data %>% 
+  filter(`SITE SEQ` == 70672, as.Date(SAMPLE_DATE) == as.Date('2006-11-29'),
+        SAMPLE_ID == 'CBBBBB REP 1',
+        PARAMETER == "WEIGHT")
+
+```
+Weight Duplicates (and probably LIPID and MOISTURE Duplicates) are for samples headed to different methods.  We do not need to pay attention to them if I am working with data already converted to dry weight or lipid weight basis.
+
+```{r}
+SWAT_data %>% 
+  filter(`SITE SEQ` == 70679, as.Date(SAMPLE_DATE) == as.Date('2003-11-04'),
+        SAMPLE_ID == 'CBRYMT REP 1',
+        PARAMETER == "2',3,4,4',5-PENTACHLOROBIPHENYL")
+```
+Here we see two IDENTICAL values from each of two different laboratory sample IDs. Again, this feels unlikely.
+
+# Checking values based on Wet WEight, Dry Weight, and Lipid Weight
+## Check that (value of LIP <= DRY <= WET)
+```{r}
+SWAT_simplified %>%
+  select(code, PARAMETER, `WEIGHT BASIS`, CONCENTRATION) %>%
+  group_by(PARAMETER) %>%
+  summarize(nlip = sum(`WEIGHT BASIS` == 'LIP', na.rm= TRUE),
+            ndry = sum(`WEIGHT BASIS` == 'DRY', na.rm= TRUE),
+            nwet = sum(`WEIGHT BASIS` == 'WET', na.rm= TRUE),
+            problem = ! (nlip<= ndry & ndry <= nwet),
+            .groups = 'drop') %>%
+    filter(problem)
+            
+```
+Two of those appear to be labeling problems, since the parameters apply to whole samples (e.g., percentage of lipids).
+It's not clear what is going on with Mercury.
+
+## Check that (value of LIP <= DRY <= WET)
+```{r}
+SWAT_simplified %>%
+  select(code, PARAMETER, `WEIGHT BASIS`, CONCENTRATION) %>%
+  group_by(code, PARAMETER) %>%
+  summarize(nlip = sum(`WEIGHT BASIS` == 'LIP', na.rm= TRUE),
+            ndry = sum(`WEIGHT BASIS` == 'DRY', na.rm= TRUE),
+            nwet = sum(`WEIGHT BASIS` == 'WET', na.rm= TRUE),
+            vlip = mean(CONCENTRATION[`WEIGHT BASIS` == 'LIP'], na.rm= TRUE),
+            vdry = mean(CONCENTRATION[`WEIGHT BASIS` == 'DRY'], na.rm= TRUE),
+            vwet = mean(CONCENTRATION[`WEIGHT BASIS` == 'WET'], na.rm= TRUE),
+            problem = ! (vlip >= vdry & vdry >= vwet),
+            .groups = 'drop') %>%
+      filter(problem)
+```
+The last six problems are all Moisture values
+
+These are all PCB values, all from one site, and all with an apparent TWO 
+sample values for each parameters.all PCBs wherethe apparent sample size is two.
+
+
+#  PCB Nomenclature
+Many of the PCBs chemical names and the PCB numerical designations turn up in the same
+number of composite samples, which suggests they are reported on the same samples  .  I wonder if these represent duplicate data.
+
+
+## Examining CAS numbers
+Lets see how many times we have duplicate values with the same CAS number.
+
+```{r}
+SWAT_data %>% 
+ # filter(`WEIGHT BASIS` == 'LIP') %>%
+  group_by(CAS_NO) %>%
+  summarize(nnames = length(unique(PARAMETER)),
+            name = first (PARAMETER),
+            .groups = 'drop') %>%
+  arrange(name)
+```
+That suggests we have no duplicates.
+
+Looking closely, all the PCBs listed by PCB number are in fact mixtures of PCBs.  So technically, they are NOT individual PCBs, and should not overlap with PCBs by CAS NUmber.  The question is, how are they used?  And especially, how are the total PCBs calculated?
+
+Lets pull one sample and look at that.
+
+## When Are the PCB numerical codes used?
+
+
+# How to Group Parameters
+One of the challenges is that we want to report totals of various groups of parameters, but the data contains no flag for major types of parameters.  We probably need to make a lookup table to be consistent.
+
+The closest thing to an indicator of the parameters in use is the `TEST METHOD` field, which provides a method code.
+It is possible that we could generate a pretty good starting point for a lookup code based on that, or it may be quicker to produce one by hand.
+
+```{r}
+methods = SWAT_data %>% select(`TEST METHOD`) %>% arrange(`TEST METHOD`) %>% unique()
+kable(methods)
+```
+## Export a Prelimnary list of Parameters
+We anticipate amending the list with parameter lists, largely by hand in Excel
+```{r}
+parm_list <- SWAT_data %>% select(PARAMETER) %>% arrange(PARAMETER) %>% unique()
+kable(parm_list)
+write_csv(parm_list, 'Parameter List.csv')
+```
+
+```{r}
+methods_data <- SWAT_data %>%
+  select(PARAMETER, `TEST METHOD`) %>%
+  group_by(`TEST METHOD`, PARAMETER) %>%
+  summarize(Test      =  first(`TEST METHOD`),
+                        .groups = 'drop') %>%
+  rename(Parameter = PARAMETER)
+kable(methods_data)
+```
+
+## Totals And Calculations
+```{r}
+totals_data <- SWAT_data %>%
+  select(PARAMETER, `TEST METHOD`) %>%
+  filter(grepl('TOTAL', PARAMETER, ignore.case = TRUE) |
+           grepl('CALCULATED', `TEST METHOD`)) %>%
+  group_by(`TEST METHOD`, PARAMETER) %>%
+  summarize(Test      =  first(`TEST METHOD`),
+                        .groups = 'drop') %>%
+  rename(Parameter = PARAMETER)
+kable(totals_data)
+
+```
+
+##  Read In a Hand Edited Classification of Parameters
+We can then read in the resulting Excel File to provide groupings...
+```{r}
+Parameter_List <- read_excel("Parameter List.xlsx", 
+    sheet = "Parameter List") %>%
+  mutate(Class = factor(Class)) %>%
+  arrange(Class, PARAMETER)
+Parameter_List
+```
+
+
+SWAT_data %>% 
+ # filter(`WEIGHT BASIS` == 'LIP') %>%
+  group_by(CAS_NO) %>%
+  summarize(nnames = length(unique(PARAMETER)),
+            name = first (PARAMETER),
+            .groups = 'drop') %>%
+  arrange(name) %>%
+  mutate(match(Parameter_List))
+
+
+# How did DEP Calculate Totals?
+Many TOTAL parameters come in triplets -- with a suffix of "-D', or '-H' or '-O'. It
+appears those are for totals calculated using different assumptions about how to
+address non-detects, with  -D stands for "detection limit", -H stands for "Half
+Detection Limit", and -0 stands for "Zero".
+
+Would be nice to confirm what parameters are included in each. so we can apply
+maximum likelihood methods.
+
+
+# Units
+We need to deal with data reported in multiple different sets of units.  We will
+need conversion factors....
 
 ```{r}
 unique(SWAT_data$`UNITS VALUE`)
@@ -59,7 +933,7 @@ unique(SWAT_data$`UNITS VALUE`)
 
 So, conversion factors based on left of '/' and right of '/'
 
-BASed on mg/g as basic 
+Based on mg/g as basic unit
 
 
 ```{r}
@@ -73,11 +947,11 @@ Some metals data in UG/G
 
 So. lets put everything in ug/g
 ```{r}
-mytxt <- 'abbrev, times
+mytxt <- 'Abbrev, Multiplier
 "G", NA
 "MG/KG", 1
-"NG/G", .001
-"NG/KG", .000001
+"NG/G",  0.001
+"NG/KG", 0.000001
 "PG/G",  1000000
 "UG/KG", 1000
 "UG/G",  1
@@ -92,5 +966,10 @@ knitr::kable(xtabs(~ PARAMETER + `WEIGHT BASIS`, data = SWAT_data))
 ```
 
 
-Examination of data shows some parameters are reported on a wet weight, dry weight, and a lipid basis.
+
+
+# Real Sample Numbers?
+Question;  I KNOW We don't have 372 separate samples, so how did we come up with
+372 entries under "COMPOSITE SAMPLE" for many PAHs?
+
 
