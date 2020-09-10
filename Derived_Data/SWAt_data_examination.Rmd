@@ -825,8 +825,9 @@ sample values for each parameters.all PCBs wherethe apparent sample size is two.
 
 
 #  PCB Nomenclature
-Many of the PCBs chemical names and the PCB numerical designations turn up in the same
-number of composite samples, which suggests they are reported on the same samples  .  I wonder if these represent duplicate data.
+Many of the PCBs chemical names and the PCB numerical designations turn up in
+the same number of composite samples, which suggests they are reported on the
+same samples  .  I wonder if these represent duplicate data.
 
 
 ## Examining CAS numbers
@@ -843,7 +844,10 @@ SWAT_data %>%
 ```
 That suggests we have no duplicates.
 
-Looking closely, all the PCBs listed by PCB number are in fact mixtures of PCBs.  So technically, they are NOT individual PCBs, and should not overlap with PCBs by CAS NUmber.  The question is, how are they used?  And especially, how are the total PCBs calculated?
+Looking closely, all the PCBs listed by PCB number are in fact mixtures of PCBs.
+So technically, they are NOT individual PCBs, and should not overlap with PCBs
+by CAS NUmber.  The question is, how are they used?  And especially, how are the
+total PCBs calculated?
 
 Lets pull one sample and look at that.
 
@@ -851,48 +855,111 @@ Lets pull one sample and look at that.
 
 
 # How to Group Parameters
-One of the challenges is that we want to report totals of various groups of parameters, but the data contains no flag for major types of parameters.  We probably need to make a lookup table to be consistent.
+One of the challenges is that we want to report totals of various groups of
+parameters, but the data contains no flag for major types of parameters.  We
+probably need to make a lookup table to be consistent.
 
-The closest thing to an indicator of the parameters in use is the `TEST METHOD` field, which provides a method code.
-It is possible that we could generate a pretty good starting point for a lookup code based on that, or it may be quicker to produce one by hand.
+The closest thing to an indicator of the groupings of parameters in use is the
+`TEST METHOD` field, which provides a method code. It is possible that we could
+generate a pretty good starting point for a lookup code based on that, or it
+may be quicker to produce one by hand.
 
-```{r}
-methods = SWAT_data %>% select(`TEST METHOD`) %>% arrange(`TEST METHOD`) %>% unique()
-kable(methods)
-```
-## Export a Prelimnary list of Parameters
-We anticipate amending the list with parameter lists, largely by hand in Excel
-```{r}
-parm_list <- SWAT_data %>% select(PARAMETER) %>% arrange(PARAMETER) %>% unique()
-kable(parm_list)
-write_csv(parm_list, 'Parameter List.csv')
-```
+## Export a Preliminary list of Parameters
+After we get a list of Parameters, we will amend it by hand in Excel
+to indicate which group each parameter falls within.
 
 ```{r}
-methods_data <- SWAT_data %>%
+SWAT_data %>%
   select(PARAMETER, `TEST METHOD`) %>%
   group_by(`TEST METHOD`, PARAMETER) %>%
   summarize(Test      =  first(`TEST METHOD`),
                         .groups = 'drop') %>%
-  rename(Parameter = PARAMETER)
-kable(methods_data)
+  rename(Parameter = PARAMETER) %>%
+  select(-Test) %>%
+  kable()
 ```
 
 ## Totals And Calculations
+Many parameters are TOTALS or Calculated sums of related contaminants. These are
+derived parameters which may be of particular iterest, but they are not primary
+analytic values.
 ```{r}
-totals_data <- SWAT_data %>%
+SWAT_data %>%
   select(PARAMETER, `TEST METHOD`) %>%
   filter(grepl('TOTAL', PARAMETER, ignore.case = TRUE) |
-           grepl('CALCULATED', `TEST METHOD`)) %>%
+         grepl('CALCULATED', `TEST METHOD`)) %>%
   group_by(`TEST METHOD`, PARAMETER) %>%
   summarize(Test      =  first(`TEST METHOD`),
                         .groups = 'drop') %>%
-  rename(Parameter = PARAMETER)
-kable(totals_data)
-
+  rename(Parameter = PARAMETER) %>%
+  kable()
 ```
 
-##  Read In a Hand Edited Classification of Parameters
+### Alternate Versions of Totals?
+Many TOTAL parameters come in triplets -- with a suffix of "-D', or '-H' or '-O'. It
+appears those are for totals calculated using different assumptions about how to
+address non-detects, with  -D stands for "detection limit", -H stands for "Half
+Detection Limit", and -0 stands for "Zero".
+
+If that's the case, any total with -D is greater than or equal to related Totals
+with -H, which in turn will be greater than any total with -O
+
+```{r}
+tmp <- SWAT_data %>%
+  filter (`WEIGHT BASIS` == 'WET') %>%
+  select(SAMPLE_ID, SAMPLE_DATE, PARAMETER, `ANALYSIS LAB`,
+         `ANALYSIS_LAB_SAMPLE_ID`, CONCENTRATION) %>%
+  filter(grepl('TOTAL', PARAMETER, ignore.case = TRUE)) %>%
+  filter(grepl('-[DHO]$', PARAMETER)) %>%
+  mutate(suffix = substr(PARAMETER, nchar(PARAMETER), nchar(PARAMETER)),
+         prefix = substr(PARAMETER, 1, nchar(PARAMETER)-2))
+tmp
+```
+
+But we have some duplicates in here ....
+```{r}
+tmp  %>% group_by(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`, ANALYSIS_LAB_SAMPLE_ID, prefix, suffix) %>%
+  summarize(n = n(),
+            d = max(CONCENTRATION)- min(CONCENTRATION),
+            .groups = 'drop') %>%
+  filter(n>1)
+```
+Those appear to be  duplicates with exactly the same value in CONENTRATION, and no other obvious discrepancies.
+
+```{r}
+SWAT_data %>%
+  filter (SAMPLE_ID == 'CBEEEE REP 1',
+          as.Date(SAMPLE_DATE) == as.Date('2007-10-31'),
+          PARAMETER == 'TOTAL PAH19-O' | 
+            PARAMETER == 'TOTAL PAH19-H' |
+             PARAMETER == 'TOTAL PAH19-D' )
+
+```
+So, looking at that site we again see no differences. This appears to be a sample duplication in the data record.  It's not the only one.
+
+Since these are apparent duplicates, we lose no information by  averaging the two values.  Here we check to make sure the different totals fall in the expoected sequence order.
+```{r}
+tmp %>%
+  group_by(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`, ANALYSIS_LAB_SAMPLE_ID, prefix, suffix) %>%
+  summarize (CONCENTRATION = mean(CONCENTRATION, na.rm = TRUE),
+          .groups = 'drop') %>%
+  pivot_wider(c(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`, ANALYSIS_LAB_SAMPLE_ID, prefix),
+              names_from = suffix,
+              values_from = CONCENTRATION) %>%
+  mutate(test = D >= H & H >= O) %>%
+filter(! test)
+```
+
+Some of the TOTALS are inexplicable, since they are "totals" of single parameters, like PAH-19, which is a name for a single compound. Are they perhaps surrogates used in the calculations that incorporate detection limits?
+
+```{r}
+SWAT_data %>%  filter (grepl('TOTAL PAH', PARAMETER)) %>%
+  select (EGAD_SITE_NAME, CURRENT_SAMPLE_POINT_NAME, `SAMPLE_DATE`, `ANALYSIS LAB`, PARAMETER)
+```
+They are all 2007 or 2009 samples from AXYS ANALYTICAL SERVICES.  They all appear to include the -D -H or -O modifiers, which suggests they are totals making different assumptions about how to handle non-detects.  But the point is, these are derived quanities, not primary quantities.
+
+
+##  Read Excel File with Classification of Parameters
 We can then read in the resulting Excel File to provide groupings...
 ```{r}
 Parameter_List <- read_excel("Parameter List.xlsx", 
@@ -913,14 +980,7 @@ SWAT_data %>%
   mutate(match(Parameter_List))
 
 
-# How did DEP Calculate Totals?
-Many TOTAL parameters come in triplets -- with a suffix of "-D', or '-H' or '-O'. It
-appears those are for totals calculated using different assumptions about how to
-address non-detects, with  -D stands for "detection limit", -H stands for "Half
-Detection Limit", and -0 stands for "Zero".
 
-Would be nice to confirm what parameters are included in each. so we can apply
-maximum likelihood methods.
 
 
 # Units
