@@ -84,6 +84,32 @@ SWAT_data <- read_excel(file.path(sibling, fn),
         "text", "text", "text"))
 ```
 
+```{r}
+nrow(SWAT_data)
+```
+
+
+# Remove duplicates
+Many sampled -- nearly 20% -- are members of a group of duplicates.  We can thinkl of no valid reason why two records should be exact dupl;icates of each other in this setting, so we remove al lduplicates using the unique() function.
+
+## How many duplicates?
+Let's generate a data subset includng all complete duplicates, and evaluate its size.
+```{r}
+dups <- SWAT_data[duplicated(SWAT_data),]
+cat(round(nrow(dups)/nrow(SWAT_data) * 100,1))
+cat(" percent of observations are duplicates.")
+```
+
+# Remove all Duplicate Data Rows
+```{r}
+SWAT_data <- unique(SWAT_data)
+```
+
+```{r}
+nrow(SWAT_data)
+```
+
+
 # Exploration of Data Codes
 ## Uninformative Codes
 ### What is Sample_ID
@@ -670,6 +696,7 @@ So, that works -- Each code has only one site, date and sample_ID.  Some of thos
 
 # Do We Get Replicate or Duplicate Parameter Values?
 Now that we have designations fdor single sampling events ( locations / dates / replicates) we can ask whether we get either duplicate data entries or replicates.
+
 ## Check for Duplicates
 ```{r}
 tmp <- SWAT_simplified %>%
@@ -681,16 +708,16 @@ tmp <- SWAT_simplified %>%
   filter(nvals > 1)
   nrow(tmp[,1])
 ```
-
-Wow!  We have duplicate values for ALMOST ALL combinations of samples and parameters.  That was a surprise. 
+Wow!  We have duplicate values for quite a FEW combinations of samples and parameters.  That was a surprise. 
 
 ```{r}
 head(tmp)
 ```
+
 ### Why Does Duplication or Replication Occur?
 
 ### A Couple of Examples
-Lets look at a few of the apparent duplicates and see if we can figure out where the duplication occurs.
+Lets look at a few of the duplicates and see if we can figure out where the duplication occurs.
 
 ```{r}
 SWAT_simplified %>% 
@@ -703,7 +730,6 @@ ANALYTICAL", but reported concentrations are identical, which is unlikely for
 different laboratories.
 
 ##  Identical Values Different Labs?
-
 ```{r}
 tmp <- SWAT_simplified %>% select(code, `SITE SEQ`, SAMPLE_DATE, PARAMETER,
                            `ANALYSIS LAB`, `ANALYSIS_LAB_SAMPLE_ID`, CONCENTRATION,
@@ -720,7 +746,7 @@ tmp %>% pull(n) %>% range()
 
  
 ```
-So, even separated by analysis lab, we see several thousand duplicates values.
+So, even separated by analysis lab, we see just over 80 duplicate values.
 To figure out why, we need to look at individual cases in the original data.
 
 ```{r}
@@ -736,14 +762,21 @@ tmp %>%  pull(n) %>% range()
 
 ```
 ```{r}
-head(tmp,6)
+tmp
 ```
-Note that the first three are identical.  The second three are NEARLY identical, but have a different CAS number,a dn the chemical name differ only by the absence of an apostrophe after the 6.  By looking on PubChem, that tiny difference in nomenclature implies the sixth chlorine is attached to a different benzene ring.
+These are all either LIPID or MOISTURE values, expressed in percent. They differ
+principally (only?) in the test method they are associated with, and sometimes
+in a parameter qualifier.  I suspect that is because these percent values are
+collected once per sample, but reported with eah analytic data series, to permit
+values to be expressed in dry or libid weight basis.  We can elimiate these
+apparent parameter duplications
 
-But we still have three unexplained duplicates of each of those values.
+```{r}
+tmp[tmp$n == 4,] %>% arrange(PARAMETER)
+```
 
-Could we find a way to test that multiple values on idividual samples match?
 
+HO do we remove these duplicates?
 
 ## Are ALL Replicates explained as Laboratory QA/QC Checks?
 
@@ -918,13 +951,15 @@ tmp
 
 But we have some duplicates in here ....
 ```{r}
-tmp  %>% group_by(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`, ANALYSIS_LAB_SAMPLE_ID, prefix, suffix) %>%
+tmp  %>% group_by(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`,
+                  ANALYSIS_LAB_SAMPLE_ID, prefix, suffix) %>%
   summarize(n = n(),
             d = max(CONCENTRATION)- min(CONCENTRATION),
             .groups = 'drop') %>%
   filter(n>1)
 ```
-Those appear to be  duplicates with exactly the same value in CONENTRATION, and no other obvious discrepancies.
+Those appear to be  duplicates with exactly the same value in CONCENTRATION, and
+no other obvious discrepancies.
 
 ```{r}
 SWAT_data %>%
@@ -935,9 +970,12 @@ SWAT_data %>%
              PARAMETER == 'TOTAL PAH19-D' )
 
 ```
-So, looking at that site we again see no differences. This appears to be a sample duplication in the data record.  It's not the only one.
+So, looking at that site we again see no differences. This appears to be a
+sample duplication in the data record.  It's not the only one.
 
-Since these are apparent duplicates, we lose no information by  averaging the two values.  Here we check to make sure the different totals fall in the expoected sequence order.
+Since these are apparent duplicates, we lose no information by  averaging the
+two values.  Here we check to make sure the different totals fall in the
+expoected sequence order.
 ```{r}
 tmp %>%
   group_by(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`, ANALYSIS_LAB_SAMPLE_ID, prefix, suffix) %>%

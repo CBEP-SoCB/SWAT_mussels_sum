@@ -38,3 +38,5 @@ Original_Data/DATA_SOURCES.html
 # Non-essential ArcGIS File
 **/GIS_FIles.idb/
 Derived_Data/imperviousness_map.mxd
+.Rproj.user
+
