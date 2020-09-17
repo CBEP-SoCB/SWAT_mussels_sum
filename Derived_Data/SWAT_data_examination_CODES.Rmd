@@ -1,0 +1,352 @@
+---
+title: "Review of Maine DEP EGAD Mussel Tissue Toxics Data Codes"
+subtitle: "Review of Data Codes and Flags"
+author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
+date: "9/10/2020"
+output:
+  github_document:
+    toc: true
+    toc_depth: 2
+    fig_width: 7
+    fig_height: 5
+---
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+
+# Introduction
+Maine's Department of Environmental Protection (DEP) maintains a large database
+of environmental data called "EGAD".  Citizens can request data from the
+database through DEP staff.
+
+CBEP requested data from DEP on levels of toxic contaminants in shellfish
+tissue samples from Casco Bay. The result is a large (> 100,000 line) excel
+spreadsheet containing data from about 40 sampling dates from 20 locations, over
+a period of more than 15 years.
+
+Unfortunately, the data delivery contains little metadata, so it takes some
+effort to understand the data format and analyze it correctly.
+
+In this Notebook we review the structure of the data to determine which data
+columns contain useful information, and derive rules for working with the data.
+
+# Load Libraries
+```{r load_libraries}
+library(tidyverse)
+library(readxl)
+library(htmltools)  # used by knitr called here only to avoid startup text later in document
+library(knitr)
+```
+# Load Data
+## Establish Folder Reference
+```{r folder_refs}
+sibfldnm <- 'Original_Data'
+parent   <- dirname(getwd())
+sibling  <- file.path(parent,sibfldnm)
+fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
+```
+
+## Copy Data
+This is a larger data file that takes some time to load.  Getting the column
+types right dramatically improves load speed. Much of the data is qualitative,
+and can't be handled in R.
+```{r copy_data}
+SWAT_data <- read_excel(file.path(sibling, fn), 
+    sheet = "Mussels Data", col_types = c("numeric", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "date", "text", "text", 
+        "text", "date", "text", "numeric", 
+        "text", "text", "text", "text", 
+        "text", "numeric", "numeric", "text", 
+        "text", "text", "text", "text", 
+        "text", "numeric", "text", 
+        "text", "text", "text", "text", 
+        "text", "text", "text"))
+
+before <- nrow(SWAT_data)
+```
+
+## Remove duplicates
+Many samples -- nearly 20% -- are members of a group of duplicates.  We can
+think of no valid reason why two records should be exact duplicates in this
+setting, so we remove all duplicates using the unique() function.
+
+## How many duplicates?
+Let's generate a data subset including all complete duplicates, and evaluate its
+size.
+```{r count_duplicates}
+dups <- SWAT_data[duplicated(SWAT_data),]
+cat(round(nrow(dups)/nrow(SWAT_data) * 100,1),
+    " percent of observations are duplicates.")
+rm(dups)
+```
+
+## Remove all Complete Duplicate Data Rows
+```{r remove_duplicates}
+SWAT_data <- unique(SWAT_data)
+```
+
+```{r percent_retained}
+(after <- nrow(SWAT_data))
+cat('We retained ', round(after/before,3)*100,
+    ' percent of rows in the original data.')
+```
+
+# Exploration of Data Codes
+## Uninformative Codes
+### What is `Sample_ID`
+The SAMPLE_ID itself appears to be a combination of other information, including
+* A site Code
+* A current sample point name, and
+* Sometimes a YEAR
+* Sometimes a method qualifier, like "DIOXIN"
+
+That "DIOXIN" qualifier is unique to "MEPH" samples, which, based on the
+similarity of the site codes used,  appear to be 2003 Gulfwatch samples. Data
+post 2000 are not available online through the Gulfwatch website.  In the EGAD
+data, they are associated with the  "FORE RIVER OUTER" location.
+
+```{r example_sample_id}
+SWAT_data %>%
+  filter(grepl('DIOXIN', SAMPLE_ID)) %>%
+         select(SAMPLE_ID, EGAD_SITE_NAME) %>%
+         unique() %>% arrange(SAMPLE_ID)
+```
+So, SAMPLE_ID combines a LOT of info that is mostly also contained in other
+data.  Unfortunately, as we will see below, it is NOT a unique sample
+identifier.
+
+### What is `SAMPLE TYPE`
+```{r sample_type}
+unique(SWAT_data$`SAMPLE TYPE`)
+```
+
+```{r sample_type_crosstab}
+as.data.frame(xtabs(~PARAMETER + `SAMPLE TYPE` , data = SWAT_data)) %>%
+  filter(SAMPLE.TYPE == 	'PHYSICAL CHARACTERISTIC' & Freq > 0)
+```
+So the ONLY parameter ever included under 'PHYSICAL CHARACTERISTIC' is the
+species of shellfish sampled.  Thus "SAMPLE TYPES"  conveys no independent
+information, and so is of little use.
+
+### What is `SAMPLE POINT TYPE`?
+```{r sample_point)type}
+unique(SWAT_data$`SAMPLE POINT TYPE`)
+
+```
+`SAMPLE POINT TYPE` contains only a single value so it is useless.  
+
+### What is `SAMPLE LOCATION`?
+```{r sample_location}
+unique(SWAT_data$`SAMPLE LOCATION`)
+```
+Again, no useful information here.
+
+### What is `RESULT TYPE`?
+```{r result_type}
+unique(SWAT_data$`RESULT TYPE`)
+```
+
+```{r parameters_with_phys_meas}
+SWAT_data %>%
+  select(`RESULT TYPE`, PARAMETER) %>%
+  filter(`RESULT TYPE`=="PHYSICAL MEASUREMENT") %>%
+  select (-`RESULT TYPE`) %>%
+  unique()
+```
+So that is uninformative too.  It mirrors SAMPLE TYPE. The only item ever
+flagged as a "PHYSICAL MEASUREMENT" is is the species of shellfish.
+
+### What is `PARAMETER_QUALIFIER`?
+```{r parameter_qualifier}
+unique(SWAT_data$`PARAMETER_QUALIFIER`)
+```
+This does not appear to be informative, but we learn later that there are some
+places where this column is the ONLY difference between what are otherwise
+apparently identical data rows.
+
+### What are `PARAMETER FILTERED` and `SAMPLE FILTER`?
+```{r filtered}
+xtabs(~ `PARAMETER FILTERED` + `SAMPLE FILTER`, data = SWAT_data, addNA = TRUE)
+```
+SO both are uninformative. Of course, tissue samples are not filtered.
+
+### What are `DEPTH` and `DEPTH UNITS`?
+```{r depth}
+xtabs( ~ DEPTH + `DEPTH UNITS`, data = SWAT_data, addNA = TRUE)
+```
+Samples were picked up from the shore, so depth is irrelevant.
+
+### What is `TREATMENT`?
+```{r treatment}
+unique(SWAT_data$`TREATMENT`)
+```
+These are observational data.
+
+### What is `METER_CALIBRATED`?
+```{r meter}
+unique(SWAT_data$`METER_CALIBRATED`)
+```
+Samples were collected, and the data provided to us does not include any
+*in situ* ancillary data like temperature or dissolved oxygen, so no data was
+collected with instruments that require calibration in the field.
+
+## Possibly Informative Codes
+### What is `CURRENT_SAMPLE_POINT_NAME`?
+```{r sample_point_name}
+as.tibble(xtabs(~SWAT_data$`CURRENT_SAMPLE_POINT_NAME`, addNA = TRUE)) %>%
+  rename_at(c(1), ~'SPoint1')
+```
+These names are meaningful, but difficult to use.  They are used consistently to
+distinguish among samples, and are connected to the spatial data, but SAMPLE
+POINT names are not unique, and can be duplicated between different sites or
+within one Sites in different years.  See the discussion of Sites and spatial
+data, below.
+
+### What is `PREP METHOD`?
+```{r prep_method}
+unique(SWAT_data$`PREP METHOD`)
+```
+So,potentially useful info, if I knew what the codes mean.  For now, we largely
+ignore these details as not relevant for our interpretation of results at this
+time.  But we may need to evaluate that assumption later.
+
+### What is `SAMPLE COLLECTION METHOD`?
+```{r sample_collection_method}
+unique(SWAT_data$`SAMPLE COLLECTION METHOD`)
+```
+Although this suggests this Code is valuable, it's not obvious what it means
+from internal data alone, or whether it has been applied fully consistently. We
+know from other information that some studies (e.g., Gulfwatch) explicitly uses
+*composite samples* from twenty *hand picked* mussels.  So both terms appear to
+apply.  We dig in a little deeper.
+
+#### Does `SAMPLE COLLECTION METHOD` Break Out by Parameter?
+```{r collection_method_by_parameter}
+xtabs(~PARAMETER + `SAMPLE COLLECTION METHOD`, data = SWAT_data) %>%
+  as.tibble() %>%
+  pivot_wider(id_cols = PARAMETER,
+              names_from = `SAMPLE COLLECTION METHOD`,
+              values_from = n) %>%
+  arrange(`COMPOSITE SAMPLE`, `PARAMETER`)
+```
+So, other than the fact that many of the pesticide data are derived only from
+composite samples, and some PCBs (by chemical name) appear only from 'hand
+picked' samples, it appears that these represent different sampling strategies,
+or at least different labels for sample collection strategies employed during
+sample collection.
+
+Curiously, the species identification '*Mytilus edulis*' is only included in the
+'COMPOSITE SAMPLE' category 7 times, MUCH less frequently than some other
+parameters.  That appears counter-intuitive. How can we have more samples for
+parameters than samples of mussels?
+
+This points not only to problems with how this Code was assigned, but also to
+a couple of things will be explored find later:  
+1.  Some samples are reported three times, on different weight bases, so we get
+    each parameter three times for each physical sample.  
+2.  There are some laboratory duplicates, again, representing physical samples
+    multiple times.  
+3.  Some samples are reported  -- apparently duplicated -- as coming from
+    different laboratories or different methods, but with no other differences.
+    
+Still, it appears this Code is inconsistent.
+
+#### Does `SAMPLE COLLECTION METHOD` Break Out by Site?
+```{r collection_method_by_site}
+xtabs(~EGAD_SITE_NAME + `SAMPLE COLLECTION METHOD`, data = SWAT_data) %>%
+  as.tibble() %>%
+  pivot_wider(id_cols = EGAD_SITE_NAME,
+              names_from = `SAMPLE COLLECTION METHOD`,
+              values_from = n) %>%
+  arrange(`COMPOSITE SAMPLE`)
+```
+So this ALMOST lines up.  With a few exceptions, all or almost all data from
+each site is flagged one way or the other.  
+
+#### Does `SAMPLE COLLECTION METHOD` Break Out by Date?
+```{r collection_method_by_date}
+xtabs(~SAMPLE_DATE + `SAMPLE COLLECTION METHOD`, data = SWAT_data) %>%
+  as.tibble() %>%
+  pivot_wider(id_cols = SAMPLE_DATE,
+              names_from = `SAMPLE COLLECTION METHOD`,
+              values_from = n)
+```
+Again, ALMOST all samples from each date are flagged one way or the other.
+This suggests there may be some inconsistency with how this Code has been
+implied.
+
+#### When is "HAND PICKED" used?
+But how can we figure out what these sample collection methods mean?  We know
+the Sample_Collection_Method for Gulfwatch was a composite of 20 mussels.
+Gulfwatch used the sample code "MEPH" for a site in "Portland Harbor". The
+related EGAD_SITE_NAME is 'FORE RIVER OUTER - CBFROR'.
+
+```{r example_collection_method}
+SWAT_data %>% filter(EGAD_SITE_NAME== 'FORE RIVER OUTER - CBFROR') %>%
+  select(c(2, 13, 7, 4, 8)) %>%
+  unique()
+```
+So this site, which follows the Gulfwatch methods is flagged consistently as "HAND-PICKED".
+
+#### Conclusion -- This is Confusing
+
+This is confusing -- it's not clear what the different sample collection codes
+mean.  They clearly segregate to some extent by sample events, but it appears
+not entirely.
+
+### What are `LAB QUALIFIER` and `VALIDATION QUALIFIER`?
+```{r qualifiers_list}
+SWAT_data %>% select(`LAB QUALIFIER`,`VALIDATION QUALIFIER`, `QUALIFIER DESCRIPTION`) %>% unique() %>% kable()
+```
+
+So it looks like the second qualifier is a subset of the first.
+
+```{r qualifiers_xtab}
+xtabs(~`LAB QUALIFIER` + `VALIDATION QUALIFIER`, data = SWAT_data, addNA = TRUE)
+```
+Interestingly, relatively few of the Lab Qualifiers were pulled out in the
+Validation Qualifiers. Why?
+
+```{r qualifiers_with_data}
+SWAT_data %>% 
+  select(`LAB QUALIFIER`, `VALIDATION QUALIFIER`, CONCENTRATION, RL, MDL) %>%
+  group_by(`LAB QUALIFIER`, `VALIDATION QUALIFIER`) %>%
+  summarize(has_data = any(! is.na(CONCENTRATION)),
+            all_data = all(! is.na(CONCENTRATION)),
+            has_RL   = any(! is.na(RL)),
+            all_RL   = all(! is.na(RL)),
+            has_MDL  = any(! is.na(MDL)),
+            all_MDL  = all(! is.na(MDL))
+            )
+```
+We generally know how to handle the `VALIDATION QUALIFIERS`
+
+*  U codes we treat as right censored.  
+*  J codes are estimated values.  We usually include those values in analyses,
+   but they may have higher error.  We do not explicitly model that.  Also in
+   these data they do not have associated detection limits.  
+*  B codes have different meanings for organic and inorganic compounds, but
+   generally they include values and and detection limits. 
+*  EMPC and B/EMPC are Estimated Maximum Possible Concentrations.  We typically
+   will handle these simply as observations, but we might want to treat them 
+   as right censored instead, especially if they are abundant.
+
+### What is `WEIGHT BASIS`?
+```{r weight_basis}
+unique(SWAT_data$`WEIGHT BASIS`)
+```
+This is explored in detail in a later notebook.
+
+### What is `DILUTION FACTOR`?
+```{r dilution}
+kable(xtabs(~as.numeric(SWAT_data$`DILUTION_FACTOR`)),
+      col.names =c("Dilution", "Frequency"))
+```
+While this is good to know, it is not clear how we use it in our analyses, as it
+is our understanding that the CONCENTRATION values are already adjusted for
+dilution.
+
