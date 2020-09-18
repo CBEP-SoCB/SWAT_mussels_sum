@@ -15,7 +15,6 @@ output:
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
   style="position:absolute;top:10px;right:50px;" />
 
-
 # Introduction
 Maine's Department of Environmental Protection (DEP) maintains a large database
 of environmental data called "EGAD".  Citizens can request data from the
@@ -29,8 +28,8 @@ a period of more than 15 years.
 Unfortunately, the data delivery contains little metadata, so it takes some
 effort to understand the data format and analyze it correctly.
 
-In this notebook we review the  parameters identified in the data
-and assign them to groups to facilitate analysis.
+In this Notebook we review the structure of the data to determine which data
+columns contain useful information, and derive rules for working with the data.
 
 # Load Libraries
 ```{r load_libraries}
@@ -39,6 +38,7 @@ library(readxl)
 library(htmltools)  # used by knitr called here only to avoid startup text later in document
 library(knitr)
 ```
+
 # Load Data
 ## Establish Folder Reference
 ```{r folder_refs}
@@ -77,6 +77,7 @@ setting, so we remove all duplicates using the unique() function.
 SWAT_data <- unique(SWAT_data)
 ```
 
+
 ## Simplify Data and Add Unique Sample Codes
 This logic was developed in "SWAT_data examination_UNIQUE.Rmd".
 ```{r}
@@ -112,8 +113,9 @@ SWAT_simplified
 
 # Totals And Calculations
 Many parameters are TOTALS or Calculated sums of related contaminants. These are
-derived parameters which may be of special interest fo sumamries for the State
+derived parameters which may be of special interest for summaries for the State
 of Casco Bay report, but they are not primary analytic values.
+
 ```{r}
 SWAT_data %>%
   select(PARAMETER, `TEST METHOD`) %>%
@@ -125,8 +127,16 @@ SWAT_data %>%
   rename(Parameter = PARAMETER) %>%
   kable()
 ```
-Unfortunately, we have no metadata showing us how most of these were calculated
-or what methods were used.
+
+Unfortunately, we have limited metadata showing us how most of these were
+calculated or what methods were used. It appears some detail is availabe in
+papers referenced in recent SWAT reports, especially LeBlanc et al., 2009.
+
+> Leblanc, L.A., Krahforst, C.F., Aubé, J., Roach, S., Brun, G., Harding, G.,
+  Hennigar, P., Page, D., Jones, S., Shaw, S., Stahlnecker, J., Schwartz, J.,
+  Taylor, D., Thorpe, B., & Wells, P. (2009).
+  Eighteenth Year of the Gulf of Maine Environmental Monitoring Program.
+  Gulf of Maine Council on the Marine Environment.
 
 ## Alternate Versions of Totals?
 Many TOTAL parameters come in triplets -- with a suffix of "-D', or '-H' or '-O'. It
