@@ -28,8 +28,8 @@ a period of more than 15 years.
 Unfortunately, the data delivery contains little metadata, so it takes some
 effort to understand the data format and analyze it correctly.
 
-In this Notebook we review the structure of the data to determine which data
-columns contain useful information, and derive rules for working with the data.
+In this notebook we review the  parameters identified in the data
+and assign them to groups to facilitate analysis.
 
 # Load Libraries
 ```{r load_libraries}
@@ -76,7 +76,6 @@ setting, so we remove all duplicates using the unique() function.
 ```{r remove_duplicates}
 SWAT_data <- unique(SWAT_data)
 ```
-
 
 ## Simplify Data and Add Unique Sample Codes
 This logic was developed in "SWAT_data examination_UNIQUE.Rmd".
