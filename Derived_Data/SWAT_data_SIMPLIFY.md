@@ -74,7 +74,7 @@ theme_set
     ##     ggplot_global$theme_current <- new
     ##     invisible(old)
     ## }
-    ## <bytecode: 0x00000000165cf620>
+    ## <bytecode: 0x00000000165aef98>
     ## <environment: namespace:ggplot2>
 
 ``` r
@@ -147,8 +147,8 @@ SWAT_simplified <- SWAT_data %>%
              -`VALIDATION COMMENT`) %>%
   
   # Create Site Code and Site Name
-  mutate    (SiteCode =  first(sub('.* - ','', `EGAD_SITE_NAME`)), 
-             Site =  first(sub(' - .*','', `EGAD_SITE_NAME`))) %>%
+  mutate    (SiteCode =  sub('.* - ','', `EGAD_SITE_NAME`), 
+             Site     =  sub(' - .*','', `EGAD_SITE_NAME`)) %>%
   select(-EGAD_SITE_NAME)
 ```
 
@@ -312,7 +312,7 @@ names(SWAT_final) <- nms
 # Save Resulting Data
 
 ``` r
-write_csv(SWAT_final, 'SWAT_data_cleaned.csv')
+write_csv(SWAT_final, 'SWAT_data_working.csv')
 ```
 
 # Save Related Metadata

@@ -71,7 +71,7 @@ theme_set
     ##     ggplot_global$theme_current <- new
     ##     invisible(old)
     ## }
-    ## <bytecode: 0x00000000165872e8>
+    ## <bytecode: 0x0000000016587cd8>
     ## <environment: namespace:ggplot2>
 
 ``` r
@@ -140,8 +140,8 @@ SWAT_simplified <- SWAT_data %>%
              -`SAMPLE COMMENT`, -`LAB COMMENT`, -`VALIDATION COMMENT`) %>%
   
   # Create Site Code and Site Name
-  mutate    (SiteCode =  first(sub('.* - ','', `EGAD_SITE_NAME`)), 
-             Site =  first(sub(' - .*','', `EGAD_SITE_NAME`))) %>%
+  mutate    (SiteCode =  sub('.* - ','', `EGAD_SITE_NAME`), 
+             Site     =  sub(' - .*','', `EGAD_SITE_NAME`)) %>%
   select    (-EGAD_SITE_NAME) %>%
   
   # Create Year Time Stamp and (Draft 1) Unique Sample ID
