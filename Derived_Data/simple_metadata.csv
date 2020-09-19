@@ -16,9 +16,11 @@ concentration,"Value of the parameter.  Usually, but not always a concentration.
 units,Abbreviation of the units used.  Most are SI units of concentration.
 qualifier,EGAD's `VALIDATION QUALIFIER`.  This is a subset of the `LABORATORY QUALIFIER`.
 qual_description,Long description of meaning ofqualifiers.  Includes other qualifiers
-rl,Reporting Limit.  LAb-determined value below which results are non-detects.
+rl,Reporting Limit.  Lab-determined value below which results are non-detects.
 mdl,Method Detection Limit.  Official limit of method
 weight_basis,"Basis for calculating concentration (wet weight, dry weight or lipid weight)."
 prep_method,Alphanumeric code for sample preparation methods.
 dilution_factor,Dilution factor for sample analysis.  It's not clear whether this is useful.
 cas_no,Chemical Abstract Number for chemical compound or mixture.
+conc_ugg,"Concentrations, expressed in micrograms per gram (or parts per million)."
+conc_ngg,"Concentrations expressed in nanograms per gram ( or parts per billion),"

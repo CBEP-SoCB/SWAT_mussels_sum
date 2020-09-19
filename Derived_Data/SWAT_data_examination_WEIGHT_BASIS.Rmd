@@ -2,7 +2,7 @@
 title: "Review of Maine DEP EGAD Mussel Tissue Toxics Data Weight Basis"
 subtitle: "Check that Weight BAsis data are Consistent"
 author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
-date: "9/10/2020"
+date: "9/18/2020"
 output:
   github_document:
     toc: true
@@ -24,28 +24,24 @@ database through DEP staff.
 CBEP requested data from DEP on levels of toxic contaminants in shellfish
 tissue samples from Casco Bay. The result is a large (> 100,000 line) excel
 spreadsheet containing data from about 40 sampling dates from 20 locations, over
-a period of more than 15 years.
+a period of more than 15 years.  
 
-Unfortunately, the data delivery contains little metadata, so it takes some
-effort to understand the data format and analyze it correctly. Among other
-problems, we need to understand dates and locations of samples, what analytes
-were used for different samples, etc.
+In this notebook, we conduct a basic data quality aSSUrance check, looking to
+determine whether values expressed on a wet weight, dry weight, and lipid weight
+basis make sense.
 
-In this notebook and accompanying notebooks, we take various slices through the
-data to understand its structure.
-
-sample_spatial.csv
-sites_spatial.csv
-Parameter List.csv
-
-While those data sets ARE produced in this notebook, WE plan to produce a
-simpler version that skips all the data exploraiton.
+*   DRY and LIPID based values are derived from wet weight
+    values, and so should be both no more numerous.  
+*   Lipid weight is a fraction of dry weight, concentrations expressed on a
+    lipid weight basis should always be greater than values expressed on a dry
+    weight basis, which should likewise exceed values expressed on a wet weight
+    basis.  
 
 # Load Libraries
 ```{r load_libraries}
 library(tidyverse)
 library(readxl)
-library(htmltools)  # used by knitr called here only to avoid startup text later in document
+library(htmltools)  # used by knitr called here  to avoid startup text later
 library(knitr)
 
 library(CBEPgraphics)
@@ -54,6 +50,7 @@ theme_set
 
 library(LCensMeans)
 ```
+
 # Load Data
 ## Establish Folder Reference
 ```{r folder_refs}
@@ -89,33 +86,49 @@ Many samples -- nearly 20% -- are members of a group of duplicates.  We can
 think of no valid reason why two records should be exact duplicates in this
 setting, so we remove all duplicates using the unique() function.
 
-## How many duplicates?
-Let's generate a data subset including all complete duplicates, and evaluate its
-size.
-```{r}
-dups <- SWAT_data[duplicated(SWAT_data),]
-cat(round(nrow(dups)/nrow(SWAT_data) * 100,1))
-cat(" percent of observations are duplicates.")
-rm(dups)
-```
-
-## Remove all Complete Duplicate Data Rows
 ```{r}
 SWAT_data <- unique(SWAT_data)
 ```
 
+## Simplify Data and Add Unique Sample Codes
+This logic was developed in "SWAT_data examination_UNIQUE.Rmd".
 ```{r}
-(after <- nrow(SWAT_data))
-cat('We retained ')
-cat (round(after/before,3)*100)
-cat ( ' percent of rows in the original data.')
+SWAT_simplified <- SWAT_data %>%
+  # Eliminate uninformative identifiers
+  select    (-`SAMPLE TYPE`, -`SAMPLE POINT TYPE`, -`SAMPLE LOCATION`,
+             -`RESULT TYPE`, -`PARAMETER_QUALIFIER`, -`PARAMETER FILTERED`,
+             -`SAMPLE FILTER`, -`DEPTH`, -`DEPTH UNITS`,
+             -TREATMENT, -`METER_CALIBRATED`) %>%
+  
+  # Eliminate data we will not analyze
+  select    (-SITE_DESCRIPTION, -ANALYSIS_DATE,
+             -`QC TYPE`, -SAMPLED_BY, -`UNITS DESCRIPTION`,
+             -`SAMPLE COMMENT`, -`LAB COMMENT`, -`VALIDATION COMMENT`) %>%
+  
+  # Create Site Code and Site Name
+  mutate    (SiteCode =  first(sub('.* - ','', `EGAD_SITE_NAME`)), 
+             Site =  first(sub(' - .*','', `EGAD_SITE_NAME`))) %>%
+  select    (-EGAD_SITE_NAME) %>%
+  
+  # Create Year Time Stamp and (Draft 1) Unique Sample ID
+  mutate    (Year  = as.numeric(format(SAMPLE_DATE, '%Y')),
+             sample_id = gsub(" ", "_", SAMPLE_ID)) %>%
+  group_by  (Year) %>%
+  mutate    (tag = as.numeric(factor(SAMPLE_DATE))) %>%
+  ungroup   ()  %>%
+  mutate    (Code = paste(sample_id, Year, tag, sep = '_')) %>%
+  select    (-sample_id, -tag) %>%
+  select    (`SITE SEQ`, SiteCode, Site, Year, SAMPLE_DATE,
+              SAMPLE_ID, Code, everything())
+SWAT_simplified
 ```
 
-# Checking values based on Wet WEight, Dry Weight, and Lipid Weight
-## Check that (value of LIP <= DRY <= WET)
+
+
+# Check That Number of LIP <= DRY <= WET
 ```{r}
 SWAT_simplified %>%
-  select(code, PARAMETER, `WEIGHT BASIS`, CONCENTRATION) %>%
+  select(Code, PARAMETER, `WEIGHT BASIS`, CONCENTRATION) %>%
   group_by(PARAMETER) %>%
   summarize(nlip = sum(`WEIGHT BASIS` == 'LIP', na.rm= TRUE),
             ndry = sum(`WEIGHT BASIS` == 'DRY', na.rm= TRUE),
@@ -125,25 +138,168 @@ SWAT_simplified %>%
     filter(problem)
             
 ```
-Two of those appear to be labeling problems, since the parameters apply to whole samples (e.g., percentage of lipids).
-It's not clear what is going on with Mercury.
+Two of those appear to be effectively attribution problems, since the parameters
+apply to whole samples (e.g., percentage of lipids and total solids).
 
-## Check that (value of LIP <= DRY <= WET)
+It's not clear what is going on with the metals. This appears to be the result
+of samples where we have data on a DRY basis but not on a WET basis.
+
 ```{r}
 SWAT_simplified %>%
-  select(code, PARAMETER, `WEIGHT BASIS`, CONCENTRATION) %>%
-  group_by(code, PARAMETER) %>%
+  select(Code, PARAMETER, `WEIGHT BASIS`) %>%
+  group_by(PARAMETER, Code) %>%
   summarize(nlip = sum(`WEIGHT BASIS` == 'LIP', na.rm= TRUE),
             ndry = sum(`WEIGHT BASIS` == 'DRY', na.rm= TRUE),
             nwet = sum(`WEIGHT BASIS` == 'WET', na.rm= TRUE),
+            problem = ! (ndry <= nwet),
+            .groups = 'drop') %>%
+    filter(problem)
+            
+```
+It appears that all data collected in 2006 lacks metals data on a wet weight
+basis.  Other missing data is associated with the PARAMETER "SOLIDS-TOTAL
+RESIDUE (TS)", where it makes no difference.
+
+This does not need correction, since the missing data will automatically be left
+out of any analysis we conduct.  If wet weight values were key for an analysis,
+we might be able to back calculate them.
+
+# Check That Value of LIP <= DRY <= WET
+```{r}
+SWAT_simplified %>%
+  select(Code, PARAMETER, `TEST METHOD`, `WEIGHT BASIS`, CONCENTRATION) %>%
+  group_by(Code, PARAMETER) %>%
+  summarize(method = first(`TEST METHOD`),
             vlip = mean(CONCENTRATION[`WEIGHT BASIS` == 'LIP'], na.rm= TRUE),
             vdry = mean(CONCENTRATION[`WEIGHT BASIS` == 'DRY'], na.rm= TRUE),
             vwet = mean(CONCENTRATION[`WEIGHT BASIS` == 'WET'], na.rm= TRUE),
+            n = n(),
             problem = ! (vlip >= vdry & vdry >= vwet),
             .groups = 'drop') %>%
       filter(problem)
 ```
-The last six problems are all Moisture values
 
-These are all PCB values, all from one site, and all with an apparent TWO 
-sample values for each parameters.all PCBs where the apparent sample size is two.
+The last six problems are all moisture values (where this is meaningless). The
+others are all PCB values, apparently from one sampling event.  that suggests
+some sort of transcription error or contamination problem in the lipid analysis.
+
+Note that the PCB errors are either `TEST METHOD` "E1668A" or calculated PCB
+values -- totals and TEQs.
+
+```{r}
+SWAT_simplified %>%
+  select(Code, PARAMETER, `WEIGHT BASIS`, CONCENTRATION, `UNITS VALUE`) %>%
+  filter(Code == "CBEEEE_REP_4_2009_5",
+         grepl('LIPID|SOLID|MOISTURE', PARAMETER))
+
+```
+
+Shouldn't `SOLIDS-TOTAL RESIDUE` be equal to `1 - MOISTURE`?  It is odd that the
+error is exactly 10%.  That suggests a typographical error. We can compare
+results to the other replicates.
+```{r}
+SWAT_simplified %>%
+  select(Code, PARAMETER, CONCENTRATION, `WEIGHT BASIS`) %>%
+  filter(grepl("CBEEEE_REP_._2009_5", Code),
+         grepl('LIPID|SOLID|MOISTURE', PARAMETER)) %>%
+  pivot_wider(Code, names_from = `WEIGHT BASIS`, values_from = CONCENTRATION)
+```
+So, for all of these EXCEPT `REP_4`, the expected identity nearly applies
+(within one percent): $DRY \approx 1 - WET$.  And the WET value is about 83.4%.
+This suggests a typographical or other error in the WET value for this sample.
+
+# Hand Calculate Values for Comparison
+We calculate values for one PARAMETER `2',3,4,4',5-PENTACHLOROBIPHENYL` by hand.
+(From the first row of the results returned above).
+```{r}
+# Dry-Weight Basis
+8.55/(1-0.903)
+# Dry-weight basis calculated based on DRY value 
+8.55/0.171
+# Lipid basis calculated based on LIP value
+8.55/0.014
+```
+The DRY basis (NEARLY) matches the value in the data.  The other two values
+don't. We can conclude that:  
+1. The "WET" `WEIGHT BASIS` values were calculated from the `MOISTURE` values.  
+2. the `SOLIDS-TOTAL RESIDUE (TS)` was not used for calculations.  
+2. The reported "LIPID" `WEIGHT BASIS` are off by a factor of ten.  
+
+We can confirm that this sample has problems by comparing results with the
+other' three FIELD replicate samples collected on the same site and day. As
+these are FIELD replicates, we do not expect identical results, but in general,
+results should be similar.
+
+Here we focus only on one `PARAMETER`, but results are similar for all PCBs.
+We include the `TEST METHOD` here because it appears all values associated with
+this test method are suspect.
+```{r}
+SWAT_simplified %>%
+  select(Code, `SITE SEQ`, SAMPLE_DATE, `TEST METHOD`, PARAMETER,
+         CONCENTRATION, `WEIGHT BASIS`) %>%
+  filter(grepl("CBEEEE_REP_._2009_5", Code),
+         PARAMETER == '2-CHLOROBIPHENYL') %>%
+  pivot_wider( names_from = `WEIGHT BASIS`, values_from = CONCENTRATION)
+```
+Compared to sample replicates:
+
+1.  The error in the LIPID-based values appears to *underestimate*
+    concentrations by a factor of ten.  That value could in principal be 
+    recalculated based on (what appears to be) the correct LIPID value. 
+    
+2.  The DRY-based value is not obviously impossible, but it is roughly 1.75
+    times the other replicates (as expected with the likely error in the
+    `MOISTURE` values.  This error can *not* be corrected, since the `MOISTURE`
+    value on which it is based is itself suspect.  
+
+To be Safe, we should probably drop this sample from the PCB calculations if we
+rely on either the LIPID or DRY WEIGHT values.
+
+The Problem does not appear to extend to other organic contaminants.
+```{r}
+SWAT_simplified %>%
+  select(Code, `SITE SEQ`, SAMPLE_DATE, `TEST METHOD`, PARAMETER,
+         CONCENTRATION, `WEIGHT BASIS`) %>%
+  filter(grepl("CBEEEE_REP_._2009_5", Code),
+         grepl('NAPHTHALENE|DDT', PARAMETER)) %>%
+  pivot_wider(names_from = `WEIGHT BASIS`, values_from = CONCENTRATION)
+```
+
+# Identify / Remove Suspect Values
+We need to remove:  
+
+1.  Data ONLY from sampling event `Code` = "CBEEEE_REP_4_2009_5"  
+2.  PCB Data with `TEST METHOD` = "E1668A"  
+3.  The four calculated PCB values based on those:  
+    *  PCB TOTAL TEQ (ND=0)  
+    *  PCB TOTAL TEQ (ND=1/2 DL)  
+    *  PCB TOTAL TEQ (ND=DL)  
+    *  PCBs  
+4.  Remove BOTH `WEIGHT BASIS` = "DRY" and `WEIGHT BASIS` = "LIPID"
+    for those samples.  
+
+## The Suspect Values
+```{r}
+SWAT_simplified %>%
+  select(Code, PARAMETER, CONCENTRATION, `TEST METHOD`, `WEIGHT BASIS`) %>%
+  filter(Code == "CBEEEE_REP_4_2009_5",
+         `TEST METHOD` == "E1668A" | 
+               PARAMETER == 'PCBS' |
+               grepl('PCB TOTAL TEQ', PARAMETER),
+         `WEIGHT BASIS` == 'LIP' | `WEIGHT BASIS` == 'DRY')
+```
+
+## A Single Logical Test Value
+So, make that selection process a single test, so it is easier to negate.
+```{r}
+mytest <- with(SWAT_simplified, 
+               Code == "CBEEEE_REP_4_2009_5" &
+               (`TEST METHOD` == "E1668A" | 
+                 PARAMETER == 'PCBS' |
+                 grepl('PCB TOTAL TEQ', PARAMETER)) &
+               (`WEIGHT BASIS` == 'LIP' | `WEIGHT BASIS` == 'DRY'))
+SWAT_simplified %>%
+  select(Code, PARAMETER, CONCENTRATION, `TEST METHOD`, `WEIGHT BASIS`) %>%
+  filter(mytest)
+```
+
