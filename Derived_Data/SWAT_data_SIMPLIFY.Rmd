@@ -1,5 +1,5 @@
 ---
-title: "Generate Simplified EGAD Mussel Toxics Data"
+title: "Generate Working Verion of EGAD Mussel Toxics Data"
 author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
 date: "9/10/2020"
 output:
@@ -141,6 +141,51 @@ SWAT_final <- SWAT_simplified %>%
   distinct(across(-`ANALYSIS LAB`), .keep_all = TRUE)
 ```
 
+# Remove Suspect Data
+See "SWAT_data_examination_WEIGHT_BASIS.Rmd" for justification.
+```{r}
+mytest <- with(SWAT_final, 
+               Code == "CBEEEE_REP_4_2009_5" &
+               (`TEST METHOD` == "E1668A" | 
+                 PARAMETER == 'PCBS' |
+                 grepl('PCB TOTAL TEQ', PARAMETER)) &
+               (`WEIGHT BASIS` == 'LIP' | `WEIGHT BASIS` == 'DRY'))
+SWAT_final <- SWAT_final %>%
+  filter(! mytest)
+```
+
+
+# Add Fixed Unit Concentration Columns
+The following units were used for concentrations at least once in the data.
+The "netexp" column provides powers of ten to convert to concentration
+measured in grams per gram (a relative value of 1, or 10^0).
+
+The logic is developed more fully in "SWAT_data_review UNITS.Rmd".
+```{r}
+conversions <- read.csv(text =
+"units, netexp
+PG/G, 	-12
+NG/KG,	-12
+NG/G,	  -9
+UG/KG,	-9
+MG/KG,	-6
+UG/G,	  -6")
+```
+
+```{r}
+uggexp <- -6
+nggexp <- -9
+
+SWAT_final <- SWAT_final %>% 
+  mutate(theexp = conversions$netexp[match(`UNITS VALUE`, conversions$units)]) %>%
+  mutate(uggconvexp = uggexp - theexp,
+         nggconvexp = nggexp - theexp) %>%
+  mutate(conc_ugg = CONCENTRATION * 10^uggconvexp,
+         conc_ngg = CONCENTRATION * 10^nggconvexp,) %>%
+  select (-theexp, -uggconvexp, -nggconvexp)
+head(SWAT_final,10)
+```
+
 # Rename Data Columns
 ```{r}
 nms <- names(SWAT_final)
@@ -165,13 +210,14 @@ nms
 names(SWAT_final) <- nms
 ```
 
-
 # Save Resulting Data
 ```{r}
 write_csv(SWAT_final, 'SWAT_data_cleaned.csv')
 ```
 
 # Save Related Metadata
+More complete metadata on the EGAD data is included in files included in the
+Original_Data folder.
 ```{r}
 metadata <- tibble(Col_Name = nms, Description = NA_character_)
 ```
@@ -195,12 +241,14 @@ metadata$Description <-
     "Abbreviation of the units used.  Most are SI units of concentration.",
     "EGAD's `VALIDATION QUALIFIER`.  This is a subset of the `LABORATORY QUALIFIER`.",
     "Long description of meaning ofqualifiers.  Includes other qualifiers",
-    "Reporting Limit.  LAb-determined value below which results are non-detects.",
+    "Reporting Limit.  Lab-determined value below which results are non-detects.",
     "Method Detection Limit.  Official limit of method",
     "Basis for calculating concentration (wet weight, dry weight or lipid weight).",
     "Alphanumeric code for sample preparation methods.",
     "Dilution factor for sample analysis.  It's not clear whether this is useful.",
-    "Chemical Abstract Number for chemical compound or mixture.")
+    "Chemical Abstract Number for chemical compound or mixture.",
+    "Concentrations, expressed in micrograms per gram (or parts per million).",
+    "Concentrations expressed in nanograms per gram ( or parts per billion),")
 
 kable(metadata)
 ```

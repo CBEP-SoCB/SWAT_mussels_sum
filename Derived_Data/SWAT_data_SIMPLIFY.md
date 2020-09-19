@@ -1,4 +1,4 @@
-Generate Simplified EGAD Mussel Toxics Data
+Generate Working Verion of EGAD Mussel Toxics Data
 ================
 Curtis C. Bohlen, Casco Bay Estuary Partnership
 9/10/2020
@@ -15,6 +15,9 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
       - [Add Unique Sampling Event
         Code](#add-unique-sampling-event-code)
   - [Remove Duplicate Samples](#remove-duplicate-samples)
+  - [Remove Suspect Data](#remove-suspect-data)
+  - [Add Fixed Unit Concentration
+    Columns](#add-fixed-unit-concentration-columns)
   - [Rename Data Columns](#rename-data-columns)
   - [Save Resulting Data](#save-resulting-data)
   - [Save Related Metadata](#save-related-metadata)
@@ -71,7 +74,7 @@ theme_set
     ##     ggplot_global$theme_current <- new
     ##     invisible(old)
     ## }
-    ## <bytecode: 0x000000001659f648>
+    ## <bytecode: 0x00000000165cf620>
     ## <environment: namespace:ggplot2>
 
 ``` r
@@ -190,6 +193,75 @@ SWAT_final <- SWAT_simplified %>%
   distinct(across(-`ANALYSIS LAB`), .keep_all = TRUE)
 ```
 
+# Remove Suspect Data
+
+See “SWAT\_data\_examination\_WEIGHT\_BASIS.Rmd” for justification.
+
+``` r
+mytest <- with(SWAT_final, 
+               Code == "CBEEEE_REP_4_2009_5" &
+               (`TEST METHOD` == "E1668A" | 
+                 PARAMETER == 'PCBS' |
+                 grepl('PCB TOTAL TEQ', PARAMETER)) &
+               (`WEIGHT BASIS` == 'LIP' | `WEIGHT BASIS` == 'DRY'))
+SWAT_final <- SWAT_final %>%
+  filter(! mytest)
+```
+
+# Add Fixed Unit Concentration Columns
+
+The following units were used for concentrations at least once in the
+data. The “netexp” column provides powers of ten to convert to
+concentration measured in grams per gram (a relative value of 1, or
+10^0).
+
+The logic is developed more fully in “SWAT\_data\_review UNITS.Rmd”.
+
+``` r
+conversions <- read.csv(text =
+"units, netexp
+PG/G,   -12
+NG/KG,  -12
+NG/G,     -9
+UG/KG,  -9
+MG/KG,  -6
+UG/G,     -6")
+```
+
+``` r
+uggexp <- -6
+nggexp <- -9
+
+SWAT_final <- SWAT_final %>% 
+  mutate(theexp = conversions$netexp[match(`UNITS VALUE`, conversions$units)]) %>%
+  mutate(uggconvexp = uggexp - theexp,
+         nggconvexp = nggexp - theexp) %>%
+  mutate(conc_ugg = CONCENTRATION * 10^uggconvexp,
+         conc_ngg = CONCENTRATION * 10^nggconvexp,) %>%
+  select (-theexp, -uggconvexp, -nggconvexp)
+head(SWAT_final,10)
+```
+
+    ## # A tibble: 10 x 25
+    ##    `SITE SEQ` SiteCode Site   Year SAMPLE_DATE         SAMPLE_ID Code 
+    ##         <dbl> <chr>    <chr> <dbl> <dttm>              <chr>     <chr>
+    ##  1      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  2      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  3      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  4      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  5      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  6      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  7      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  8      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  9      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ## 10      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ## # ... with 18 more variables: CURRENT_SAMPLE_POINT_NAME <chr>, `ANALYSIS
+    ## #   LAB` <chr>, ANALYSIS_LAB_SAMPLE_ID <chr>, `TEST METHOD` <chr>, `TEST METHOD
+    ## #   DESCRIPTION` <chr>, PARAMETER <chr>, CONCENTRATION <dbl>, `UNITS
+    ## #   VALUE` <chr>, `VALIDATION QUALIFIER` <chr>, `QUALIFIER DESCRIPTION` <chr>,
+    ## #   RL <dbl>, MDL <dbl>, `WEIGHT BASIS` <chr>, `PREP METHOD` <chr>,
+    ## #   DILUTION_FACTOR <chr>, CAS_NO <chr>, conc_ugg <dbl>, conc_ngg <dbl>
+
 # Rename Data Columns
 
 ``` r
@@ -210,7 +282,8 @@ nms
     ## [17] "qualifier_description"     "rl"                       
     ## [19] "mdl"                       "weight_basis"             
     ## [21] "prep_method"               "dilution_factor"          
-    ## [23] "cas_no"
+    ## [23] "cas_no"                    "conc_ugg"                 
+    ## [25] "conc_ngg"
 
 ``` r
 nms[8]  <- "samp_pt_name"
@@ -229,7 +302,8 @@ nms
     ##  [9] "lab"              "lab_id"           "method"           "method_name"     
     ## [13] "parameter"        "concentration"    "units"            "qualifier"       
     ## [17] "qual_description" "rl"               "mdl"              "weight_basis"    
-    ## [21] "prep_method"      "dilution_factor"  "cas_no"
+    ## [21] "prep_method"      "dilution_factor"  "cas_no"           "conc_ugg"        
+    ## [25] "conc_ngg"
 
 ``` r
 names(SWAT_final) <- nms
@@ -242,6 +316,9 @@ write_csv(SWAT_final, 'SWAT_data_cleaned.csv')
 ```
 
 # Save Related Metadata
+
+More complete metadata on the EGAD data is included in files included in
+the Original\_Data folder.
 
 ``` r
 metadata <- tibble(Col_Name = nms, Description = NA_character_)
@@ -266,12 +343,14 @@ metadata$Description <-
     "Abbreviation of the units used.  Most are SI units of concentration.",
     "EGAD's `VALIDATION QUALIFIER`.  This is a subset of the `LABORATORY QUALIFIER`.",
     "Long description of meaning ofqualifiers.  Includes other qualifiers",
-    "Reporting Limit.  LAb-determined value below which results are non-detects.",
+    "Reporting Limit.  Lab-determined value below which results are non-detects.",
     "Method Detection Limit.  Official limit of method",
     "Basis for calculating concentration (wet weight, dry weight or lipid weight).",
     "Alphanumeric code for sample preparation methods.",
     "Dilution factor for sample analysis.  It's not clear whether this is useful.",
-    "Chemical Abstract Number for chemical compound or mixture.")
+    "Chemical Abstract Number for chemical compound or mixture.",
+    "Concentrations, expressed in micrograms per gram (or parts per million).",
+    "Concentrations expressed in nanograms per gram ( or parts per billion),")
 
 kable(metadata)
 ```
@@ -295,12 +374,14 @@ kable(metadata)
 | units             | Abbreviation of the units used. Most are SI units of concentration.            |
 | qualifier         | EGAD’s `VALIDATION QUALIFIER`. This is a subset of the `LABORATORY QUALIFIER`. |
 | qual\_description | Long description of meaning ofqualifiers. Includes other qualifiers            |
-| rl                | Reporting Limit. LAb-determined value below which results are non-detects.     |
+| rl                | Reporting Limit. Lab-determined value below which results are non-detects.     |
 | mdl               | Method Detection Limit. Official limit of method                               |
 | weight\_basis     | Basis for calculating concentration (wet weight, dry weight or lipid weight).  |
 | prep\_method      | Alphanumeric code for sample preparation methods.                              |
 | dilution\_factor  | Dilution factor for sample analysis. It’s not clear whether this is useful.    |
 | cas\_no           | Chemical Abstract Number for chemical compound or mixture.                     |
+| conc\_ugg         | Concentrations, expressed in micrograms per gram (or parts per million).       |
+| conc\_ngg         | Concentrations expressed in nanograms per gram ( or parts per billion),        |
 
 ``` r
 write_csv(metadata, 'simple_metadata.csv')

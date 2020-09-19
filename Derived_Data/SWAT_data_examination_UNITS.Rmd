@@ -1,6 +1,6 @@
 ---
-title: "Review of Maine DEP EGAD Mussel Tissue Toxics Data Parameters"
-subtitle: "Review and Classify Chemical Parameters"
+title: "Review of Maine DEP EGAD Mussel Tissue Toxics Data UNITS"
+subtitle: "Identify and Convert Concentration Units"
 author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
 date: "9/10/2020"
 output:
@@ -15,7 +15,6 @@ output:
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
   style="position:absolute;top:10px;right:50px;" />
 
-
 # Introduction
 Maine's Department of Environmental Protection (DEP) maintains a large database
 of environmental data called "EGAD".  Citizens can request data from the
@@ -26,20 +25,10 @@ tissue samples from Casco Bay. The result is a large (> 100,000 line) excel
 spreadsheet containing data from about 40 sampling dates from 20 locations, over
 a period of more than 15 years.
 
-Unfortunately, the data delivery contains little metadata, so it takes some
-effort to understand the data format and analyze it correctly. Among other
-problems, we need to understand dates and locations of samples, what analytes
-were used for different samples, etc.
+In this notebook we examine how units of concentration are expressed, and
+develop a strategy to generate data in consistent units regardless of how data
+was originally expressed.
 
-In this notebook and accompanying notebooks, we take various slices through the
-data to understand its structure.
-
-sample_spatial.csv
-sites_spatial.csv
-Parameter List.csv
-
-While those data sets ARE produced in this notebook, WE plan to produce a
-simpler version that skips all the data exploraiton.
 
 # Load Libraries
 ```{r load_libraries}
@@ -89,184 +78,132 @@ Many samples -- nearly 20% -- are members of a group of duplicates.  We can
 think of no valid reason why two records should be exact duplicates in this
 setting, so we remove all duplicates using the unique() function.
 
-## How many duplicates?
-Let's generate a data subset including all complete duplicates, and evaluate its
-size.
-```{r}
-dups <- SWAT_data[duplicated(SWAT_data),]
-cat(round(nrow(dups)/nrow(SWAT_data) * 100,1))
-cat(" percent of observations are duplicates.")
-rm(dups)
-```
-
-## Remove all Complete Duplicate Data Rows
 ```{r}
 SWAT_data <- unique(SWAT_data)
 ```
 
+## Simplify Data and Add Unique Sample Codes
+This logic was developed in "SWAT_data examination_UNIQUE.Rmd".
 ```{r}
-(after <- nrow(SWAT_data))
-cat('We retained ')
-cat (round(after/before,3)*100)
-cat ( ' percent of rows in the original data.')
+SWAT_simplified <- SWAT_data %>%
+  # Eliminate uninformative identifiers
+  select    (-`SAMPLE TYPE`, -`SAMPLE POINT TYPE`, -`SAMPLE LOCATION`,
+             -`RESULT TYPE`, -`PARAMETER_QUALIFIER`, -`PARAMETER FILTERED`,
+             -`SAMPLE FILTER`, -`DEPTH`, -`DEPTH UNITS`,
+             -TREATMENT, -`METER_CALIBRATED`) %>%
+  
+  # Eliminate data we will not analyze
+  select    (-SITE_DESCRIPTION, -ANALYSIS_DATE,
+             -`QC TYPE`, -SAMPLED_BY, -`UNITS DESCRIPTION`,
+             -`SAMPLE COMMENT`, -`LAB COMMENT`, -`VALIDATION COMMENT`) %>%
+  
+  # Create Site Code and Site Name
+  mutate    (SiteCode =  first(sub('.* - ','', `EGAD_SITE_NAME`)), 
+             Site =  first(sub(' - .*','', `EGAD_SITE_NAME`))) %>%
+  select    (-EGAD_SITE_NAME) %>%
+  
+  # Create Year Time Stamp and (Draft 1) Unique Sample ID
+  mutate    (Year  = as.numeric(format(SAMPLE_DATE, '%Y')),
+             sample_id = gsub(" ", "_", SAMPLE_ID)) %>%
+  group_by  (Year) %>%
+  mutate    (tag = as.numeric(factor(SAMPLE_DATE))) %>%
+  ungroup   ()  %>%
+  mutate    (Code = paste(sample_id, Year, tag, sep = '_')) %>%
+  select    (-sample_id, -tag) %>%
+  select    (`SITE SEQ`, SiteCode, Site, Year, SAMPLE_DATE,
+              SAMPLE_ID, Code, everything())
 ```
 
-#  PCB Nomenclature
-Many of the PCBs chemical names and the PCB numerical designations turn up in
-the same number of composite samples, which suggests they are reported on the
-same samples  .  I wonder if these represent duplicate data.
-
-
-## Examining CAS numbers
-Lets see how many times we have duplicate values with the same CAS number.
+# What Units are Used?
+We need to deal with data reported in multiple different units. Our interest
+here focuses only on units of concentration.
 
 ```{r}
-SWAT_data %>% 
- # filter(`WEIGHT BASIS` == 'LIP') %>%
-  group_by(CAS_NO) %>%
-  summarize(nnames = length(unique(PARAMETER)),
-            name = first (PARAMETER),
-            .groups = 'drop') %>%
-  arrange(name)
-```
-That suggests we have no duplicates.
-
-Looking closely, all the PCBs listed by PCB number are in fact mixtures of PCBs.
-So technically, they are NOT individual PCBs, and should not overlap with PCBs
-by CAS NUmber.  The question is, how are they used?  And especially, how are the
-total PCBs calculated?
-
-Lets pull one sample and look at that.
-
-## When Are the PCB numerical codes used?
-
-
-# How to Group Parameters
-One of the challenges is that we want to report totals of various groups of
-parameters, but the data contains no flag for major types of parameters.  We
-probably need to make a lookup table to be consistent.
-
-The closest thing to an indicator of the groupings of parameters in use is the
-`TEST METHOD` field, which provides a method code. It is possible that we could
-generate a pretty good starting point for a lookup code based on that, or it
-may be quicker to produce one by hand.
-
-## Export a Preliminary list of Parameters
-After we get a list of Parameters, we will amend it by hand in Excel
-to indicate which group each parameter falls within.
-
-```{r}
-SWAT_data %>%
-  select(PARAMETER, `TEST METHOD`) %>%
-  group_by(`TEST METHOD`, PARAMETER) %>%
-  summarize(Test      =  first(`TEST METHOD`),
-                        .groups = 'drop') %>%
-  rename(Parameter = PARAMETER) %>%
-  select(-Test) %>%
-  kable()
+knitr::kable(xtabs(~PARAMETER+`UNITS VALUE`, data  = SWAT_data))
 ```
 
-## Totals And Calculations
-Many parameters are TOTALS or Calculated sums of related contaminants. These are
-derived parameters which may be of particular iterest, but they are not primary
-analytic values.
+*  Lipids, moisture and solids are in percent  
+*  Sample weight is in g  
+*  metals are in mg/kg or ug/g (roughly, ppm)  
+*  Organic contaminants are mostly in ng/g, ng/kg or pg/g 
+
+In other words, there is little consistency.
+
+
+# Calculate Unit Equivalences
+We explore automating assignment of multipliers just to minimize risk of
+typographical or other errors.
+
 ```{r}
-SWAT_data %>%
-  select(PARAMETER, `TEST METHOD`) %>%
-  filter(grepl('TOTAL', PARAMETER, ignore.case = TRUE) |
-         grepl('CALCULATED', `TEST METHOD`)) %>%
-  group_by(`TEST METHOD`, PARAMETER) %>%
-  summarize(Test      =  first(`TEST METHOD`),
-                        .groups = 'drop') %>%
-  rename(Parameter = PARAMETER) %>%
-  kable()
+(units <- unique(SWAT_simplified$`UNITS VALUE`))
+```
+```{r}
+(units <- units [-c(3,4,8)])
+```
+## Metric Prefixes
+```{r}
+prefixes <- "Prefix, Exponent
+N,  -9
+M,  -3
+K,  +3
+U,  -6
+P, -12"
+p <- as.tibble(read.csv(text = prefixes))
+# The following works, but is mighty ugly.  there must be a better way....
+p <- p %>% mutate(Multiplier = 10^Exponent) %>% arrange(Exponent)
+p
 ```
 
-### Alternate Versions of Totals?
-Many TOTAL parameters come in triplets -- with a suffix of "-D', or '-H' or '-O'. It
-appears those are for totals calculated using different assumptions about how to
-address non-detects, with  -D stands for "detection limit", -H stands for "Half
-Detection Limit", and -0 stands for "Zero".
-
-If that's the case, any total with -D is greater than or equal to related Totals
-with -H, which in turn will be greater than any total with -O
-
+## Calculate Multipliers for Units
+### Find the Numerator and Denominator
 ```{r}
-tmp <- SWAT_data %>%
-  filter (`WEIGHT BASIS` == 'WET') %>%
-  select(SAMPLE_ID, SAMPLE_DATE, PARAMETER, `ANALYSIS LAB`,
-         `ANALYSIS_LAB_SAMPLE_ID`, CONCENTRATION) %>%
-  filter(grepl('TOTAL', PARAMETER, ignore.case = TRUE)) %>%
-  filter(grepl('-[DHO]$', PARAMETER)) %>%
-  mutate(suffix = substr(PARAMETER, nchar(PARAMETER), nchar(PARAMETER)),
-         prefix = substr(PARAMETER, 1, nchar(PARAMETER)-2))
-tmp
+(num <-  sub("/.*", '', units))
+(den <-  sub("^.*/", '', units))
 ```
-
-But we have some duplicates in here ....
+### Construct a Simple Function
+That matches units in grams with related exponent.
 ```{r}
-tmp  %>% group_by(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`,
-                  ANALYSIS_LAB_SAMPLE_ID, prefix, suffix) %>%
-  summarize(n = n(),
-            d = max(CONCENTRATION)- min(CONCENTRATION),
-            .groups = 'drop') %>%
-  filter(n>1)
+find_exponent <- function (x){
+  if (nchar(x)==1) return(0)
+  pre <- substr(x,1,1)
+  if (pre %in% p$Prefix) {
+     return(p$Exponent[p$Prefix == pre])
+  }
+  else
+    return(NA_integer_)
+}
+find_exponent("NG")
 ```
-Those appear to be  duplicates with exactly the same value in CONCENTRATION, and
-no other obvious discrepancies.
-
+### Use lapply to Calculate Net Exponent for Units 
 ```{r}
-SWAT_data %>%
-  filter (SAMPLE_ID == 'CBEEEE REP 1',
-          as.Date(SAMPLE_DATE) == as.Date('2007-10-31'),
-          PARAMETER == 'TOTAL PAH19-O' | 
-            PARAMETER == 'TOTAL PAH19-H' |
-             PARAMETER == 'TOTAL PAH19-D' )
-
-```
-So, looking at that site we again see no differences. This appears to be a
-sample duplication in the data record.  It's not the only one.
-
-Since these are apparent duplicates, we lose no information by  averaging the
-two values.  Here we check to make sure the different totals fall in the
-expoected sequence order.
-```{r}
-tmp %>%
-  group_by(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`, ANALYSIS_LAB_SAMPLE_ID, prefix, suffix) %>%
-  summarize (CONCENTRATION = mean(CONCENTRATION, na.rm = TRUE),
-          .groups = 'drop') %>%
-  pivot_wider(c(SAMPLE_ID, SAMPLE_DATE, `ANALYSIS LAB`, ANALYSIS_LAB_SAMPLE_ID, prefix),
-              names_from = suffix,
-              values_from = CONCENTRATION) %>%
-  mutate(test = D >= H & H >= O) %>%
-filter(! test)
-```
-
-Some of the TOTALS are inexplicable, since they are "totals" of single parameters, like PAH-19, which is a name for a single compound. Are they perhaps surrogates used in the calculations that incorporate detection limits?
-
-```{r}
-SWAT_data %>%  filter (grepl('TOTAL PAH', PARAMETER)) %>%
-  select (EGAD_SITE_NAME, CURRENT_SAMPLE_POINT_NAME, `SAMPLE_DATE`, `ANALYSIS LAB`, PARAMETER)
-```
-They are all 2007 or 2009 samples from AXYS ANALYTICAL SERVICES.  They all appear to include the -D -H or -O modifiers, which suggests they are totals making different assumptions about how to handle non-detects.  But the point is, these are derived quanities, not primary quantities.
-
-
-##  Read Excel File with Classification of Parameters
-We can then read in the resulting Excel File to provide groupings...
-```{r}
-Parameter_List <- read_excel("Parameter List.xlsx", 
-    sheet = "Parameter List") %>%
-  mutate(Class = factor(Class)) %>%
-  arrange(Class, PARAMETER)
-Parameter_List
+conversions <- tibble(units = units, num = num, den = den) %>%
+  mutate( numexp = unlist(lapply(num, find_exponent)),
+          denexp = unlist(lapply(den, find_exponent)),
+          netexp = numexp-denexp) %>%
+  arrange(netexp)
+conversions
 ```
 
 
-SWAT_data %>% 
- # filter(`WEIGHT BASIS` == 'LIP') %>%
-  group_by(CAS_NO) %>%
-  summarize(nnames = length(unique(PARAMETER)),
-            name = first (PARAMETER),
-            .groups = 'drop') %>%
-  arrange(name) %>%
-  mutate(match(Parameter_List))
+# Express Data in Consistent Units
+In other Analyses, we have used ug/g for metals and ng/g for organic
+contaminants.  So we will express concentrations in those units,
+extracting the correct conversion factors from the conversions table.
+
+```{r}
+uggexp <- -6
+nggexp <- -9
+
+test <- SWAT_simplified %>% 
+  select(CONCENTRATION, `UNITS VALUE`) %>%
+  mutate(theexp = conversions$netexp[match(`UNITS VALUE`, conversions$units)]) %>%
+  mutate(uggconvexp = uggexp - theexp,
+         nggconvexp = nggexp - theexp) %>%
+  mutate(conc_ugg = CONCENTRATION * 10^uggconvexp,
+         conc_ngg = CONCENTRATION * 10^nggconvexp,) %>%
+  select (-theexp, -uggconvexp, -nggconvexp)
+head(test,10)
+```
+
+
+
