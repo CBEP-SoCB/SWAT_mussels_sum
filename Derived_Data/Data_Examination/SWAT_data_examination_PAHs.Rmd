@@ -1,0 +1,430 @@
+---
+title: "Review of Maine DEP EGAD Mussel Tissue Toxics PAHs"
+subtitle: "PAH Analysis"
+author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
+date: "9/18/2020"
+output:
+  github_document:
+    toc: true
+    toc_depth: 2
+    fig_width: 7
+    fig_height: 5
+---
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+# Introduction
+Maine's Department of Environmental Protection (DEP) maintains a large database
+of environmental data called "EGAD".  Citizens can request data from the
+database through DEP staff.
+
+CBEP requested data from DEP on levels of toxic contaminants in shellfish
+tissue samples from Casco Bay. The result is a large (> 100,000 line) excel
+spreadsheet containing data from about 40 sampling dates from 20 locations, over
+a period of more than 15 years.
+
+Unfortunately, the data delivery contains limited metadata, so it takes some
+effort to understand the data format and analyze it correctly.
+
+In this notebook we review how PAH values were handled in the data and try to
+recreate some calculations to check our understanding, and in hopes that we
+could recreate some calculations using more modern statistical methods for
+addressing non-detects.
+
+# PAHs Totals
+In the Leblanc et al. 2009 paper (Table 2), totals (for PAHs) were described as
+follows:
+
+Parameter        |         Definition from Leblanc et al 2009
+-----------------|-------------------------------------------
+PAH19            |Sum of substituted PAHS
+-----------------|-------------------------------------------
+PAH24            |PAH19 plus "a few alkyl-substituted PAHs, as indicated"
+-----------------|-------------------------------------------
+Total PAH        |Sum of 40 PAH compounds in the table.
+-----------------|-------------------------------------------
+PCB21            |The Sum of 21 PCB Congeners, calculated to be consiustent with
+                 |NOAA Status and Trends.
+-----------------|-------------------------------------------
+PEST21           | Sum of chlorinated PEsticides and DDTs
+
+The exact PAH's included in each of the totals are indicated in the tables in
+LeBlanc et al. 2009.  We added tabs to the  Excel File "Parameter List.xlsx"
+that include each of the parameters metnioned in that table, as best as we can
+reconstruct them.
+
+**The Tables in LeBlanc et al. 2009 contain what appear to be errors.
+For example, there are 41 PAH compounds listed in Table 2, not 40 as
+suggested by the nomenclature.**
+
+A more thorough review of which PAHs were measured from many of these same field
+samples is available in the MAine DEP SWAT program's 2017-2018 report to the
+legislature:
+
+>  Maine Department of Environmental Protection (DEP) 2019.  Surface Water
+   Ambient Toxics Monitoring Program 2017-2018 Report to the Joint
+   Standing Committee on Environment and Natural Resources, 129th Legislature,
+   First Session. Available at: 
+   http://www.maine.gov/dep/water/monitoring/toxics/swat/index.htm
+
+
+
+
+
+# Load Libraries
+```{r load_libraries}
+library(tidyverse)
+library(readxl)
+library(htmltools)  # used by knitr called here only to avoid startup text later
+library(knitr)
+```
+
+# Load Data
+## Establish Folder Reference
+```{r folder_refs}
+auntfldnm <- 'Original_Data'
+parent   <- dirname(getwd())
+grandparent <- dirname(parent)
+aunt  <- file.path(grandparent,auntfldnm)
+fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
+```
+
+## Copy Data
+This is a larger data file that takes some time to load.  Getting the column
+types right dramatically improves load speed. Much of the data is qualitative,
+and can't be handled in R.
+```{r copy_data}
+SWAT_data <- read_excel(file.path(aunt, fn), 
+    sheet = "Mussels Data", col_types = c("numeric", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "date", "text", "text", 
+        "text", "date", "text", "numeric", 
+        "text", "text", "text", "text", 
+        "text", "numeric", "numeric", "text", 
+        "text", "text", "text", "text", 
+        "text", "numeric", "text", 
+        "text", "text", "text", "text", 
+        "text", "text", "text"))
+before <- nrow(SWAT_data)
+```
+
+## Remove duplicates
+Many samples -- nearly 20% -- are members of a group of duplicates.  We can
+think of no valid reason why two records should be exact duplicates in this
+setting, so we remove all duplicates using the unique() function.
+```{r remove_duplicates}
+SWAT_data <- unique(SWAT_data)
+```
+
+## Simplify Data and Add Unique Sample Codes
+This logic was developed in "SWAT_data examination_UNIQUE.Rmd".
+```{r}
+SWAT_simplified <- SWAT_data %>%
+  # Eliminate uninformative identifiers
+  select    (-`SAMPLE TYPE`, -`SAMPLE POINT TYPE`, -`SAMPLE LOCATION`,
+             -`RESULT TYPE`, -`PARAMETER_QUALIFIER`, -`PARAMETER FILTERED`,
+             -`SAMPLE FILTER`, -`DEPTH`, -`DEPTH UNITS`,
+             -TREATMENT, -`METER_CALIBRATED`) %>%
+  
+  # Eliminate data we will not analyze
+  select    (-SITE_DESCRIPTION, -ANALYSIS_DATE,
+             -`QC TYPE`, -SAMPLED_BY, -`UNITS DESCRIPTION`,
+             -`SAMPLE COMMENT`, -`LAB COMMENT`, -`VALIDATION COMMENT`) %>%
+  
+  # Create Site Code and Site Name
+  mutate    (SiteCode =  sub('.* - ','', `EGAD_SITE_NAME`), 
+             Site     =  sub(' - .*','', `EGAD_SITE_NAME`)) %>%
+  select    (-EGAD_SITE_NAME) %>%
+  
+  # Create Year Time Stamp and (Draft 1) Unique Sample ID
+  mutate    (Year  = as.numeric(format(SAMPLE_DATE, '%Y')),
+             sample_id = gsub(" ", "_", SAMPLE_ID)) %>%
+  group_by  (Year) %>%
+  mutate    (tag = as.numeric(factor(SAMPLE_DATE))) %>%
+  ungroup   ()  %>%
+  mutate    (Code = paste(sample_id, Year, tag, sep = '_')) %>%
+  select    (-sample_id, -tag) %>%
+  select    (`SITE SEQ`, SiteCode, Site, Year, SAMPLE_DATE,
+              SAMPLE_ID, Code, everything())
+```
+
+## Add Class to the Working Data
+We can then read in the resulting Excel File to provide groupings...
+```{r}
+Parameter_List <- read_excel(file.path(parent,"Parameter List.xlsx"), 
+    sheet = "Parameter List") %>%
+  mutate(Class = factor(Class)) %>%
+  arrange(Class, PARAMETER)
+
+SWAT_simplified <- SWAT_simplified %>% 
+  mutate(Class = Parameter_List$Class[match(PARAMETER, Parameter_List$PARAMETER)])
+```
+
+
+# When Does Each Total Exist?
+We look  narrowly at WET weights and totals that treat non-detects as zero.
+We make the assumption for now that the lessons learned from that subset apply 
+to the related data.
+```{r}
+SWAT_simplified %>%
+  select(Code, ANALYSIS_LAB_SAMPLE_ID, `WEIGHT BASIS`,
+         PARAMETER, CONCENTRATION) %>%
+  filter (`WEIGHT BASIS` == 'WET') %>%
+  filter(grepl('-O$', PARAMETER)) %>%
+  filter(grepl("TOTAL PAH/d/d", PARAMETER) |
+           grepl("TOTAL PAH", PARAMETER)) %>%
+  pivot_wider(c(Code, ANALYSIS_LAB_SAMPLE_ID),
+              names_from = PARAMETER, values_from = CONCENTRATION) %>%
+  mutate(HasTotal = !(is.na(`TOTAL PAH-O` )),
+         Has40 = !(is.na( `TOTAL PAH40-O`)),
+         Has24 = !(is.na( `TOTAL PAH24-O`)),
+         Has19 = !(is.na( `TOTAL PAH19-O`))) %>%
+  select(-`TOTAL PAH-O`, -`TOTAL PAH40-O`,
+         -`TOTAL PAH24-O`, -`TOTAL PAH19-O`) %>%
+  group_by(HasTotal) %>%
+  summarize(With40 = sum(Has40),
+            With24 = sum(Has24),
+            With19 = sum(Has19),
+            .groups = 'drop')
+```
+
+So measures of the totals are usually all found together.  The 19 PAH subset
+is sometimes available when the other totals are NOT available.
+
+# Are Total PAHs and Total PAH40 equal?
+```{r}
+SWAT_simplified %>%
+  select(Code, ANALYSIS_LAB_SAMPLE_ID, `WEIGHT BASIS`,
+         PARAMETER, CONCENTRATION) %>%
+  filter (`WEIGHT BASIS` == 'WET') %>%
+  filter(grepl('-O$', PARAMETER)) %>%
+  filter(grepl("TOTAL PAH40", PARAMETER) |
+           grepl("TOTAL PAH", PARAMETER)) %>%
+  pivot_wider(c(Code, ANALYSIS_LAB_SAMPLE_ID),
+              names_from = PARAMETER, values_from = CONCENTRATION) %>%
+  mutate(same = `TOTAL PAH40-O` == `TOTAL PAH-O`) %>%
+  group_by(same) %>%
+  summarize(n = n(),
+            totallarger = sum(`TOTAL PAH40-O` < `TOTAL PAH-O` ))
+```
+The two values are NOT the same.  When they both exist, TOTAL PAH is always
+larger.
+
+# Preparing to Calculate Diagnostic Totals
+## Load PAH Lists
+```{r}
+pah19list <- read_excel(file.path(parent,"Parameter List.xlsx"), 
+                        sheet = "PAH19 List", col_names = 'Parameter') %>%
+  pull('Parameter')
+pah24list <- read_excel(file.path(parent,"Parameter List.xlsx"), 
+                        sheet = "PAH24 List", col_names = 'Parameter') %>%
+  pull('Parameter')
+pah40list <- read_excel(file.path(parent,"Parameter List.xlsx"), 
+                        sheet = "PAH40 List", col_names = 'Parameter') %>%
+  pull('Parameter')
+```
+
+##  Create Helper Function
+We need a helper function to make facilitate calculating selective sums.
+
+We want to traverse a pair of vectors so that we add the second value to an 
+accumulating sum if and only if the value in out first vector is in our
+selection.
+
+But we also want to highlight problems with the input data, such has missing
+values.  For a sum to be 100% legitimate, it needs to include all values.
+
+(Option:  Could add parameter to allow user to select how this program behaves
+if parameters are missing. Warn, Return NA, Raise Error.)
+```{r}
+add_if_list <- function(parms, vals, sel) {
+  stopifnot(length(parms) == length(vals))
+  if (! all(sel %in% parms)) {
+    miss <- sel[ ! (sel %in% parms)]
+      warning('The following parameters are missing:\n')
+      walk(miss, function(X) warning('\t', X, '\n'))
+  }
+  sum(vals[parms %in% sel], na.rm = TRUE)
+}
+```
+
+Note that this function warns NOT if data for a particular parameter is
+missing, but if there is no entry for that parameter.  This allows us
+to accommodate right censored values, where CONCENTRATION is NA, but
+there is information on the detection limits (in another column).
+
+# Calculating PAH 19
+We can calculate PAH19 totals and compare results to the `TOTAL PAH19` results
+provided for (most) samples by DEP.
+```{r}
+tst <- SWAT_simplified %>%
+  select(Code, ANALYSIS_LAB_SAMPLE_ID, `WEIGHT BASIS`,
+         PARAMETER, CONCENTRATION, Class)%>%
+  filter (`WEIGHT BASIS` == 'WET') %>%
+  #filter(grepl('CBANAN_REP_[0-9]_2007_1', Code)) %>%
+  filter(grepl('PAH', Class)) %>%
+  group_by(Code, ANALYSIS_LAB_SAMPLE_ID) %>%
+  summarize(PAH19 = add_if_list(PARAMETER, CONCENTRATION, pah19list),
+            hasoriginal = any(PARAMETER == 'TOTAL PAH19-O'),
+            original = sum(if_else(PARAMETER == 'TOTAL PAH19-O',
+                                   CONCENTRATION,0)),
+            difference = PAH19-original,
+            .groups = 'drop') %>%
+  mutate(original = if_else(hasoriginal, original, NA_real_),
+         difference = if_else(hasoriginal, difference, NA_real_)) %>%
+  select ( - hasoriginal)
+tst
+
+```
+```{r}
+mean(tst$difference, na.rm=TRUE)
+sd(tst$difference, na.rm=TRUE)
+max(tst$difference, na.rm=TRUE)
+min(tst$difference, na.rm=TRUE)
+```
+So, our totals are not quite the same. They are, on average, slightly lower, but
+not consistently so.  Occasionally, differences are very large. Not good....
+
+Analysis of the other PAH totals (PAH24, PAH40) show similar differences between
+original reported totals, and the totals we calculated.  We are unable to
+resolve those differences, which probably relate to the exact compounds added
+for each sample.
+
+# Warnings about Missing Parameters for PAH19
+The warnings produced by our helper function help identify data inconsistnecies.
+IN particular, they highlight differences among samples in the way they handle
+the following parameters:  
+*  BENZO(B)FLUORANTHENE
+*	 BENZO(K)FLUORANTHENE
+*  DIBENZOTHIOPHENE
+
+The thiophenes are not measured in all samples.
+
+Handling of the Benzoflouranthenes differs because BENZO(B)FLUORANTHENE,
+BENZO(j)FLUORANTHENE and BENZO(K)FLUORANTHENE are chemically quite similar. They
+are often reported as a sum, under a variety of conventions, including:
+
+```{r}
+BenzoFs <- SWAT_simplified %>%
+  select(PARAMETER, Class) %>%
+  filter(Class == 'PAH') %>%
+  filter(grepl('BENZO', PARAMETER)) %>%
+  filter(grepl('FLUORANTHENE', PARAMETER)) %>%
+  unique()  %>% pull(PARAMETER)
+(BenzoFs <- BenzoFs[-2])   # remove a spurious match
+```
+# How are Benzoflouranthenes Reported?
+```{r}
+SWAT_simplified %>%
+  select(Code, ANALYSIS_LAB_SAMPLE_ID, `WEIGHT BASIS`,
+         `TEST METHOD`, PARAMETER, CONCENTRATION, Class)%>%
+  filter (`WEIGHT BASIS` == 'WET') %>%
+  filter(PARAMETER %in% BenzoFs) %>%
+  pivot_wider(c(Code, ANALYSIS_LAB_SAMPLE_ID, `TEST METHOD`),
+                names_from = PARAMETER, values_from = CONCENTRATION) %>%
+  rename_all(~ c('Code', 'Samp', 'Method', 'BJK', 'None', 'B', 'JK', 'K'))
+  
+```
+
+The data falls into FOUR categories: 
+
+1.  ONLY BENZO[B,J,K]FLUORANTHENES reported  
+2.  ONLY BENZOFLUORANTHENE reported (2006 data) These samples report the same
+    `TEST METHOD` as the ones reporting BENZO[B,J,K]FLUORANTHENES, so we suspect
+    the terms are synonyms, but can not be certain.
+3.  BENZO[J,K]FLUORANTHENES and BENZO(B)FLUORANTHENE reported separately. These 
+    samples also report the same `TEST METHOD`.  Sum of the two should be
+    similar to the first two categories, except that differences may arise due 
+    to treatment of non-detects. Such differences should be small.
+4.  Although BENZO(K)FLOURANTHENE was reported above detection limits only once,
+    examination of that sample and its field replicates show that for those 
+    samples, both BENZO(B)FLOURANTHENE and BENZO(K)FLOURANTHENE were reported, 
+    but almost always below detection limits.  These samples use a slightly 
+    different `TEST METHOD`.  It is not clear whether the sum of these two
+    values is comparable to teh prior three methods or not.
+
+All benzoflouranthenes can be summed, without double counting, but totals
+may not be directly comparable, especially for Group (4).  In particular, PAH19
+totals (as described in Leblanc et al. 2009) nominally include
+BENZO(B)FLUORANTHENE and BENZO(K)FLUORANTHENE, but not BENZO(J)FLUORANTHENE.
+
+We include all of these near-synonyms in our list of parameters to sum to 
+produce  PAH19, PAH24, and PAH40 totals.  This appears appropriate since 
+different samples do not "mix and match" how results were reported.
+
+**Done.**
+
+## Relatioship between Totals and benzoflouranthenes
+Lets see what totals are reported with each pattern.
+```{r}
+SWAT_simplified %>%
+  select(Code, ANALYSIS_LAB_SAMPLE_ID, `WEIGHT BASIS`,
+         PARAMETER, CONCENTRATION, Class)%>%
+  filter (`WEIGHT BASIS` == 'WET') %>%
+  filter(PARAMETER %in% BenzoFs | grepl('TOTAL*.PAH', PARAMETER)) %>%
+  filter(! (grepl('-H', PARAMETER) | grepl('-D', PARAMETER))) %>%
+  pivot_wider(c(Code, ANALYSIS_LAB_SAMPLE_ID),
+                names_from = PARAMETER, values_from = CONCENTRATION) %>%
+  mutate(across(3:11, function(X) as.integer(X>0))) %>%
+  select(-`BENZO(B)FLUORANTHENE`, -BENZOFLUORANTHENE) %>%
+  group_by(`BENZO[B,J,K]FLUORANTHENES`, `BENZO[J,K]FLUORANTHENES`, `BENZO(K)FLUORANTHENE`) %>%
+  summarize(across(3:6, sum, na.rm=TRUE), .groups = 'keep')
+```
+
+*  BENZO[BJK]FLOURANTHENES are reported as TOTAL PAH19 ALWAYS(?) other TOTAL PAH
+   values sometimes.  
+*  BENZO[J,K]FLUORANTHENES and BENZO[B]FLUORANTHENES are reported with TOTALs  
+*  BENZOFLOURANTHENE was NEVER reported with  TOTALs  
+*  BENZO(K)FLOURANTHENE was NEVER reported with TOTALs  
+
+
+# "C-" Totals
+Other Totals and Calculated values follow standard practice.  These include all
+the values prefaced by "C1-", "C2-", "C3-", and "C4-" except the diagnostic
+ratios treated next.
+
+The number following the C represents the number of alkyl carbons added to a
+basic PAH structure. Many of these categories originated in the uncertainty of
+separating chemically similar compounds using certain (often older) analytic
+methods.  More recently, with methods better able to differentiate among these
+compounds, the totals may be calculated, as apparently they are here.
+
+```{r}
+SWAT_simplified %>%
+  select(Code, `TEST METHOD`, ANALYSIS_LAB_SAMPLE_ID, `WEIGHT BASIS`,
+         PARAMETER, CONCENTRATION, Class)%>%
+  filter (`WEIGHT BASIS` == 'WET') %>%
+  filter(grepl('C[1-9]-', PARAMETER)) %>%    # C functions
+  filter(! grepl('/', PARAMETER)) %>%       # Not c ratios
+  pivot_wider(names_from = Class, values_from = CONCENTRATION) %>%
+  select( -ANALYSIS_LAB_SAMPLE_ID, -`WEIGHT BASIS`)
+```
+We have not yet been able to determine for sure which individual PAHs are summed
+to produce each of these calaulated totals.
+
+# Diagnotic Ratios
+Some of these PARAMETERS are diagnostic RATIOS, not totals.  These ratios are
+useful for determining the likely sources of the PAH mixtures.  Such
+"fingerprinting"  is not a priority for the 2020 State of the Bay report.
+
+Here is a list of the diagnostic ratios reported:
+```{r}
+SWAT_simplified %>%
+  select(Code, `TEST METHOD`, ANALYSIS_LAB_SAMPLE_ID, `WEIGHT BASIS`,
+         PARAMETER, CONCENTRATION, Class)%>%
+  filter (`WEIGHT BASIS` == 'WET') %>%
+  filter(grepl('C[1-9]-.*?/', PARAMETER)) %>%
+  group_by(PARAMETER) %>%
+  summarize (Name = first( PARAMETER), .groups = 'drop') %>%
+  pull(Name)
+```
+
+
+# Next Steps
+In the absence of certainty about how totals were calculated, we are not in a
+position to recalculate totals either for basic QA/QC checks or to use more
+modern statistical methods for handling non-detects.  We are forced to rely on
+the diagnostic totals calculated by DEP.

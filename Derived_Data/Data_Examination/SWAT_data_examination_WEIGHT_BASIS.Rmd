@@ -54,9 +54,10 @@ library(LCensMeans)
 # Load Data
 ## Establish Folder Reference
 ```{r folder_refs}
-sibfldnm <- 'Original_Data'
+auntfldnm <- 'Original_Data'
 parent   <- dirname(getwd())
-sibling  <- file.path(parent,sibfldnm)
+grandparent <- dirname(parent)
+aunt  <- file.path(grandparent,auntfldnm)
 fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
 ```
 
@@ -64,8 +65,8 @@ fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
 This is a larger data file that takes some time to load.  Getting the column
 types right dramatically improves load speed. Much of the data is qualitative,
 and can't be handled in R.
-```{r}
-SWAT_data <- read_excel(file.path(sibling, fn), 
+```{r copy_data}
+SWAT_data <- read_excel(file.path(aunt, fn), 
     sheet = "Mussels Data", col_types = c("numeric", 
         "text", "text", "text", "text", "text", 
         "text", "text", "text", "text", "text", 

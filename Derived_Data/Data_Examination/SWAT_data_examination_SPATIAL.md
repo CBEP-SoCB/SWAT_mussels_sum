@@ -52,14 +52,14 @@ sample\_spatial.csv sites\_spatial.csv
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ---------------------------------------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------------------------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts ------------------------------------------------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------------------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -79,7 +79,7 @@ theme_set
     ##     ggplot_global$theme_current <- new
     ##     invisible(old)
     ## }
-    ## <bytecode: 0x0000000016587b70>
+    ## <bytecode: 0x0000000016571ed0>
     ## <environment: namespace:ggplot2>
 
 ``` r
@@ -91,9 +91,10 @@ library(LCensMeans)
 ## Establish Folder Reference
 
 ``` r
-sibfldnm <- 'Original_Data'
+auntfldnm <- 'Original_Data'
 parent   <- dirname(getwd())
-sibling  <- file.path(parent,sibfldnm)
+grandparent <- dirname(parent)
+aunt  <- file.path(grandparent,auntfldnm)
 fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
 ```
 
@@ -104,7 +105,7 @@ column types right dramatically improves load speed. Much of the data is
 qualitative, and can’t be handled in R.
 
 ``` r
-SWAT_data <- read_excel(file.path(sibling, fn), 
+SWAT_data <- read_excel(file.path(aunt, fn), 
     sheet = "Mussels Data", col_types = c("numeric", 
         "text", "text", "text", "text", "text", 
         "text", "text", "text", "text", "text", 
@@ -213,7 +214,7 @@ reported sites.
 
 ``` r
 fn <- 'CascoBay_SWAT_Spatial.xlsx'
-samples_spatial_data <- read_excel(file.path(sibling, fn))%>%
+samples_spatial_data <- read_excel(file.path(aunt, fn))%>%
   mutate(`SITE UTM X` = as.numeric(`SITE UTM X`),
          `SITE UTM Y` = as.numeric(`SITE UTM Y`),
          `SITE LATITUDE` = as.numeric(`SITE LATITUDE`),

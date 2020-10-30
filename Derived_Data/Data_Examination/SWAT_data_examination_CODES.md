@@ -14,7 +14,29 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
         Rows](#remove-all-complete-duplicate-data-rows)
   - [Exploration of Data Codes](#exploration-of-data-codes)
       - [Uninformative Codes](#uninformative-codes)
+          - [What is `Sample_ID`](#what-is-sample_id)
+          - [What is `SAMPLE TYPE`](#what-is-sample-type)
+          - [What is `SAMPLE POINT TYPE`?](#what-is-sample-point-type)
+          - [What is `SAMPLE LOCATION`?](#what-is-sample-location)
+          - [What is `RESULT TYPE`?](#what-is-result-type)
+          - [What is
+            `PARAMETER_QUALIFIER`?](#what-is-parameter_qualifier)
+          - [What are `PARAMETER FILTERED` and `SAMPLE
+            FILTER`?](#what-are-parameter-filtered-and-sample-filter)
+          - [What are `DEPTH` and `DEPTH
+            UNITS`?](#what-are-depth-and-depth-units)
+          - [What is `TREATMENT`?](#what-is-treatment)
+          - [What is `METER_CALIBRATED`?](#what-is-meter_calibrated)
       - [Possibly Informative Codes](#possibly-informative-codes)
+          - [What is
+            `CURRENT_SAMPLE_POINT_NAME`?](#what-is-current_sample_point_name)
+          - [What is `PREP METHOD`?](#what-is-prep-method)
+          - [What is `SAMPLE COLLECTION
+            METHOD`?](#what-is-sample-collection-method)
+          - [What are `LAB QUALIFIER` and `VALIDATION
+            QUALIFIER`?](#what-are-lab-qualifier-and-validation-qualifier)
+          - [What is `WEIGHT BASIS`?](#what-is-weight-basis)
+          - [What is `DILUTION FACTOR`?](#what-is-dilution-factor)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -44,14 +66,14 @@ with the data.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ----------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------------------------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts -------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------------------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -66,9 +88,10 @@ library(knitr)
 ## Establish Folder Reference
 
 ``` r
-sibfldnm <- 'Original_Data'
+auntfldnm <- 'Original_Data'
 parent   <- dirname(getwd())
-sibling  <- file.path(parent,sibfldnm)
+grandparent <- dirname(parent)
+aunt  <- file.path(grandparent,auntfldnm)
 fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
 ```
 
@@ -79,7 +102,7 @@ column types right dramatically improves load speed. Much of the data is
 qualitative, and can’t be handled in R.
 
 ``` r
-SWAT_data <- read_excel(file.path(sibling, fn), 
+SWAT_data <- read_excel(file.path(aunt, fn),
     sheet = "Mussels Data", col_types = c("numeric", 
         "text", "text", "text", "text", "text", 
         "text", "text", "text", "text", "text", 

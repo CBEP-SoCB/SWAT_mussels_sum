@@ -6,9 +6,9 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
   - [Introduction](#introduction)
   - [Load Libraries](#load-libraries)
   - [Load Data](#load-data)
-      - [Establish Folder Reference](#establish-folder-reference)
+      - [Establish Folder References](#establish-folder-references)
       - [Copy Data](#copy-data)
-      - [Remove duplicates](#remove-duplicates)
+      - [Remove Duplicates](#remove-duplicates)
   - [Sampling Dates and Sites](#sampling-dates-and-sites)
       - [How Many Times has Each Site Been
         Sampled?](#how-many-times-has-each-site-been-sampled)
@@ -45,14 +45,14 @@ through the data to understand its structure.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ---------------------------------------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------------------------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts ------------------------------------------------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------------------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -64,12 +64,13 @@ library(knitr)
 
 # Load Data
 
-## Establish Folder Reference
+## Establish Folder References
 
 ``` r
-sibfldnm <- 'Original_Data'
+auntfldnm <- 'Original_Data'
 parent   <- dirname(getwd())
-sibling  <- file.path(parent,sibfldnm)
+grandparent <- dirname(parent)
+aunt  <- file.path(grandparent,auntfldnm)
 fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
 ```
 
@@ -80,7 +81,7 @@ column types right dramatically improves load speed. Much of the data is
 qualitative, and can’t be handled in R.
 
 ``` r
-SWAT_data <- read_excel(file.path(sibling, fn), 
+SWAT_data <- read_excel(file.path(aunt, fn),
     sheet = "Mussels Data", col_types = c("numeric", 
         "text", "text", "text", "text", "text", 
         "text", "text", "text", "text", "text", 
@@ -96,7 +97,7 @@ SWAT_data <- read_excel(file.path(sibling, fn),
 before <- nrow(SWAT_data)
 ```
 
-## Remove duplicates
+## Remove Duplicates
 
 Many samples – nearly 20% – are members of a group of duplicates. We can
 think of no valid reason why two records should be exact duplicates in
