@@ -18,6 +18,8 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
   - [Remove Suspect Data](#remove-suspect-data)
   - [Add Fixed Unit Concentration
     Columns](#add-fixed-unit-concentration-columns)
+  - [Express Data in Consistent
+    Units](#express-data-in-consistent-units)
   - [Rename Data Columns](#rename-data-columns)
   - [Save Resulting Data](#save-resulting-data)
   - [Save Related Metadata](#save-related-metadata)
@@ -47,14 +49,14 @@ unique sample ID code, and removes duplicate records.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ----------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------------------------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts -------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------------------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -74,7 +76,7 @@ theme_set
     ##     ggplot_global$theme_current <- new
     ##     invisible(old)
     ## }
-    ## <bytecode: 0x00000000165aef98>
+    ## <bytecode: 0x00000000165c11d0>
     ## <environment: namespace:ggplot2>
 
 ``` r
@@ -129,7 +131,7 @@ SWAT_data <- unique(SWAT_data)
 
 ## Remove Uninformative Data Categories
 
-Details provided iv “SWAT\_data\_examination\_CODES.Rmd”.
+Details provided in “SWAT\_data\_examination\_CODES.Rmd”.
 
 ``` r
 SWAT_simplified <- SWAT_data %>%
@@ -143,7 +145,7 @@ SWAT_simplified <- SWAT_data %>%
   select    (-SITE_DESCRIPTION, -ANALYSIS_DATE,
              -`QC TYPE`, -SAMPLED_BY, 
              -`SAMPLE COLLECTION METHOD`, -`UNITS DESCRIPTION`,
-             - `LAB QUALIFIER`, -`SAMPLE COMMENT`, -`LAB COMMENT`,
+             -`SAMPLE COMMENT`, -`LAB COMMENT`,
              -`VALIDATION COMMENT`) %>%
   
   # Create Site Code and Site Name
@@ -228,21 +230,37 @@ MG/KG,  -6
 UG/G,     -6")
 ```
 
+We calculate values in two sets of standardized units: nanograms per
+gram and micrograms per gram. For later convenience, we also calculate
+reporting limits in those same units.
+
+# Express Data in Consistent Units
+
+In other Analyses, we have used ug/g for metals and ng/g for organic
+contaminants. So we will express concentrations in those units,
+extracting the correct conversion factors from the conversions table.
+
+The logic is, we go from units to g/g by multiplying by 10^netexp, and
+get from g/g to the desired units by multiplying by either 10^6 or 10^9.
+Since both steps are multiplications, we add exponents.
+
 ``` r
-uggexp <- -6
-nggexp <- -9
+uggexp <- 6
+nggexp <- 9
 
 SWAT_final <- SWAT_final %>% 
   mutate(theexp = conversions$netexp[match(`UNITS VALUE`, conversions$units)]) %>%
-  mutate(uggconvexp = uggexp - theexp,
-         nggconvexp = nggexp - theexp) %>%
-  mutate(conc_ugg = CONCENTRATION * 10^uggconvexp,
-         conc_ngg = CONCENTRATION * 10^nggconvexp,) %>%
+  mutate(uggconvexp = uggexp + theexp,
+         nggconvexp = nggexp + theexp) %>%
+  mutate(conc_ugg   = CONCENTRATION * 10^uggconvexp,
+         conc_ngg   = CONCENTRATION * 10^nggconvexp,
+         rl_ugg     = RL            * 10^uggconvexp,
+         rl_ngg     = RL            * 10^nggconvexp) %>%
   select (-theexp, -uggconvexp, -nggconvexp)
 head(SWAT_final,10)
 ```
 
-    ## # A tibble: 10 x 25
+    ## # A tibble: 10 x 28
     ##    `SITE SEQ` SiteCode Site   Year SAMPLE_DATE         SAMPLE_ID Code 
     ##         <dbl> <chr>    <chr> <dbl> <dttm>              <chr>     <chr>
     ##  1      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
@@ -255,12 +273,13 @@ head(SWAT_final,10)
     ##  8      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
     ##  9      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
     ## 10      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
-    ## # ... with 18 more variables: CURRENT_SAMPLE_POINT_NAME <chr>, `ANALYSIS
+    ## # ... with 21 more variables: CURRENT_SAMPLE_POINT_NAME <chr>, `ANALYSIS
     ## #   LAB` <chr>, ANALYSIS_LAB_SAMPLE_ID <chr>, `TEST METHOD` <chr>, `TEST METHOD
     ## #   DESCRIPTION` <chr>, PARAMETER <chr>, CONCENTRATION <dbl>, `UNITS
-    ## #   VALUE` <chr>, `VALIDATION QUALIFIER` <chr>, `QUALIFIER DESCRIPTION` <chr>,
-    ## #   RL <dbl>, MDL <dbl>, `WEIGHT BASIS` <chr>, `PREP METHOD` <chr>,
-    ## #   DILUTION_FACTOR <chr>, CAS_NO <chr>, conc_ugg <dbl>, conc_ngg <dbl>
+    ## #   VALUE` <chr>, `LAB QUALIFIER` <chr>, `VALIDATION QUALIFIER` <chr>,
+    ## #   `QUALIFIER DESCRIPTION` <chr>, RL <dbl>, MDL <dbl>, `WEIGHT BASIS` <chr>,
+    ## #   `PREP METHOD` <chr>, DILUTION_FACTOR <chr>, CAS_NO <chr>, conc_ugg <dbl>,
+    ## #   conc_ngg <dbl>, rl_ugg <dbl>, rl_ngg <dbl>
 
 # Rename Data Columns
 
@@ -278,12 +297,13 @@ nms
     ##  [9] "analysis_lab"              "analysis_lab_sample_id"   
     ## [11] "test_method"               "test_method_description"  
     ## [13] "parameter"                 "concentration"            
-    ## [15] "units_value"               "validation_qualifier"     
-    ## [17] "qualifier_description"     "rl"                       
-    ## [19] "mdl"                       "weight_basis"             
-    ## [21] "prep_method"               "dilution_factor"          
-    ## [23] "cas_no"                    "conc_ugg"                 
-    ## [25] "conc_ngg"
+    ## [15] "units_value"               "lab_qualifier"            
+    ## [17] "validation_qualifier"      "qualifier_description"    
+    ## [19] "rl"                        "mdl"                      
+    ## [21] "weight_basis"              "prep_method"              
+    ## [23] "dilution_factor"           "cas_no"                   
+    ## [25] "conc_ugg"                  "conc_ngg"                 
+    ## [27] "rl_ugg"                    "rl_ngg"
 
 ``` r
 nms[8]  <- "samp_pt_name"
@@ -292,18 +312,19 @@ nms[10] <- "lab_id"
 nms[11] <- "method"
 nms[12] <- "method_name"
 nms[15] <- "units"
-nms[16] <- "qualifier"
-nms[17] <- "qual_description"
+nms[16] <- "lab_qualifier"
+nms[17] <- "qualifier"
+nms[18] <- "qual_description"
 nms
 ```
 
     ##  [1] "site_seq"         "sitecode"         "site"             "year"            
     ##  [5] "sample_date"      "sample_id"        "code"             "samp_pt_name"    
     ##  [9] "lab"              "lab_id"           "method"           "method_name"     
-    ## [13] "parameter"        "concentration"    "units"            "qualifier"       
-    ## [17] "qual_description" "rl"               "mdl"              "weight_basis"    
-    ## [21] "prep_method"      "dilution_factor"  "cas_no"           "conc_ugg"        
-    ## [25] "conc_ngg"
+    ## [13] "parameter"        "concentration"    "units"            "lab_qualifier"   
+    ## [17] "qualifier"        "qual_description" "rl"               "mdl"             
+    ## [21] "weight_basis"     "prep_method"      "dilution_factor"  "cas_no"          
+    ## [25] "conc_ugg"         "conc_ngg"         "rl_ugg"           "rl_ngg"
 
 ``` r
 names(SWAT_final) <- nms
@@ -341,47 +362,53 @@ metadata$Description <-
     "Name of chemical or physical parameter.",
     "Value of the parameter.  Usually, but not always a concentration.",
     "Abbreviation of the units used.  Most are SI units of concentration.",
-    "EGAD's `VALIDATION QUALIFIER`.  This is a subset of the `LABORATORY QUALIFIER`.",
-    "Long description of meaning ofqualifiers.  Includes other qualifiers",
+    "Laboratory data qualifier. Sometimes caries non-detect flags missing in the next QUALIFIER.",
+    "EGAD's `VALIDATION QUALIFIER`.  This is usually a subset of the `LABORATORY QUALIFIER`.",
+    "Long description of meaning of Validation qualifiers.  Includes some other qualifiers.",
     "Reporting Limit.  Lab-determined value below which results are non-detects.",
-    "Method Detection Limit.  Official limit of method",
+    "Method Detection Limit.  Official limit of method.  Usually much lower than Reporting Limit.",
     "Basis for calculating concentration (wet weight, dry weight or lipid weight).",
     "Alphanumeric code for sample preparation methods.",
     "Dilution factor for sample analysis.  It's not clear whether this is useful.",
     "Chemical Abstract Number for chemical compound or mixture.",
     "Concentrations, expressed in micrograms per gram (or parts per million).",
-    "Concentrations expressed in nanograms per gram ( or parts per billion),")
+    "Concentrations expressed in nanograms per gram (or parts per billion),",
+    "Reporting limits, expressed in micrograms per gram (or parts per million).",
+    "Reporting limits expressed in nanograms per gram (or parts per billion),")
 
 kable(metadata)
 ```
 
-| Col\_Name         | Description                                                                    |
-| :---------------- | :----------------------------------------------------------------------------- |
-| site\_seq         | EGAD sequence number for designated SITE.                                      |
-| sitecode          | Alphanumeric code for a specific SITE.                                         |
-| site              | Name or description of SITE.                                                   |
-| year              | Year of sample collection.                                                     |
-| sample\_date      | Date of sample collection.                                                     |
-| sample\_id        | Original EGAD sample ID – NOT unique.                                          |
-| code              | Derived, lengthy alphanumaric code for individual sampling events.             |
-| samp\_pt\_name    | EGAD sample point name. NOT unique. Possibly unique within sites.              |
-| lab               | Laboratory conducting analyses.                                                |
-| lab\_id           | Internal laboratory sample ID number.                                          |
-| method            | Alphanumeric code for specific laboratory method.                              |
-| method\_name      | Name of method.                                                                |
-| parameter         | Name of chemical or physical parameter.                                        |
-| concentration     | Value of the parameter. Usually, but not always a concentration.               |
-| units             | Abbreviation of the units used. Most are SI units of concentration.            |
-| qualifier         | EGAD’s `VALIDATION QUALIFIER`. This is a subset of the `LABORATORY QUALIFIER`. |
-| qual\_description | Long description of meaning ofqualifiers. Includes other qualifiers            |
-| rl                | Reporting Limit. Lab-determined value below which results are non-detects.     |
-| mdl               | Method Detection Limit. Official limit of method                               |
-| weight\_basis     | Basis for calculating concentration (wet weight, dry weight or lipid weight).  |
-| prep\_method      | Alphanumeric code for sample preparation methods.                              |
-| dilution\_factor  | Dilution factor for sample analysis. It’s not clear whether this is useful.    |
-| cas\_no           | Chemical Abstract Number for chemical compound or mixture.                     |
-| conc\_ugg         | Concentrations, expressed in micrograms per gram (or parts per million).       |
-| conc\_ngg         | Concentrations expressed in nanograms per gram ( or parts per billion),        |
+| Col\_Name         | Description                                                                                 |
+| :---------------- | :------------------------------------------------------------------------------------------ |
+| site\_seq         | EGAD sequence number for designated SITE.                                                   |
+| sitecode          | Alphanumeric code for a specific SITE.                                                      |
+| site              | Name or description of SITE.                                                                |
+| year              | Year of sample collection.                                                                  |
+| sample\_date      | Date of sample collection.                                                                  |
+| sample\_id        | Original EGAD sample ID – NOT unique.                                                       |
+| code              | Derived, lengthy alphanumaric code for individual sampling events.                          |
+| samp\_pt\_name    | EGAD sample point name. NOT unique. Possibly unique within sites.                           |
+| lab               | Laboratory conducting analyses.                                                             |
+| lab\_id           | Internal laboratory sample ID number.                                                       |
+| method            | Alphanumeric code for specific laboratory method.                                           |
+| method\_name      | Name of method.                                                                             |
+| parameter         | Name of chemical or physical parameter.                                                     |
+| concentration     | Value of the parameter. Usually, but not always a concentration.                            |
+| units             | Abbreviation of the units used. Most are SI units of concentration.                         |
+| lab\_qualifier    | Laboratory data qualifier. Sometimes caries non-detect flags missing in the next QUALIFIER. |
+| qualifier         | EGAD’s `VALIDATION QUALIFIER`. This is usually a subset of the `LABORATORY QUALIFIER`.      |
+| qual\_description | Long description of meaning of Validation qualifiers. Includes some other qualifiers.       |
+| rl                | Reporting Limit. Lab-determined value below which results are non-detects.                  |
+| mdl               | Method Detection Limit. Official limit of method. Usually much lower than Reporting Limit.  |
+| weight\_basis     | Basis for calculating concentration (wet weight, dry weight or lipid weight).               |
+| prep\_method      | Alphanumeric code for sample preparation methods.                                           |
+| dilution\_factor  | Dilution factor for sample analysis. It’s not clear whether this is useful.                 |
+| cas\_no           | Chemical Abstract Number for chemical compound or mixture.                                  |
+| conc\_ugg         | Concentrations, expressed in micrograms per gram (or parts per million).                    |
+| conc\_ngg         | Concentrations expressed in nanograms per gram (or parts per billion),                      |
+| rl\_ugg           | Reporting limits, expressed in micrograms per gram (or parts per million).                  |
+| rl\_ngg           | Reporting limits expressed in nanograms per gram (or parts per billion),                    |
 
 ``` r
 write_csv(metadata, 'simple_metadata.csv')

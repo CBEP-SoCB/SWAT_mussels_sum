@@ -81,7 +81,7 @@ SWAT_data <- unique(SWAT_data)
 
 # Simplify Data
 ## Remove Uninformative Data Categories
-Details provided iv "SWAT_data_examination_CODES.Rmd".
+Details provided in "SWAT_data_examination_CODES.Rmd".
 ```{r}
 SWAT_simplified <- SWAT_data %>%
   # Eliminate uninformative identifiers
@@ -94,7 +94,7 @@ SWAT_simplified <- SWAT_data %>%
   select    (-SITE_DESCRIPTION, -ANALYSIS_DATE,
              -`QC TYPE`, -SAMPLED_BY, 
              -`SAMPLE COLLECTION METHOD`, -`UNITS DESCRIPTION`,
-             - `LAB QUALIFIER`, -`SAMPLE COMMENT`, -`LAB COMMENT`,
+             -`SAMPLE COMMENT`, -`LAB COMMENT`,
              -`VALIDATION COMMENT`) %>%
   
   # Create Site Code and Site Name
@@ -172,16 +172,31 @@ MG/KG,	-6
 UG/G,	  -6")
 ```
 
+We calculate values in two sets of standardized units:  nanograms per gram and
+micrograms per gram. For later convenience, we also calculate reporting limits
+in those same  units.
+
+# Express Data in Consistent Units
+In other Analyses, we have used ug/g for metals and ng/g for organic
+contaminants.  So we will express concentrations in those units,
+extracting the correct conversion factors from the conversions table.
+
+The logic is, we go from units to g/g by multiplying by 10^netexp, and get from
+g/g to the desired units by multiplying by either 10^6 or 10^9.  Since both
+steps are multiplications, we add exponents.
+
 ```{r}
-uggexp <- -6
-nggexp <- -9
+uggexp <- 6
+nggexp <- 9
 
 SWAT_final <- SWAT_final %>% 
   mutate(theexp = conversions$netexp[match(`UNITS VALUE`, conversions$units)]) %>%
-  mutate(uggconvexp = uggexp - theexp,
-         nggconvexp = nggexp - theexp) %>%
-  mutate(conc_ugg = CONCENTRATION * 10^uggconvexp,
-         conc_ngg = CONCENTRATION * 10^nggconvexp,) %>%
+  mutate(uggconvexp = uggexp + theexp,
+         nggconvexp = nggexp + theexp) %>%
+  mutate(conc_ugg   = CONCENTRATION * 10^uggconvexp,
+         conc_ngg   = CONCENTRATION * 10^nggconvexp,
+         rl_ugg     = RL            * 10^uggconvexp,
+         rl_ngg     = RL            * 10^nggconvexp) %>%
   select (-theexp, -uggconvexp, -nggconvexp)
 head(SWAT_final,10)
 ```
@@ -201,8 +216,9 @@ nms[10] <- "lab_id"
 nms[11] <- "method"
 nms[12] <- "method_name"
 nms[15] <- "units"
-nms[16] <- "qualifier"
-nms[17] <- "qual_description"
+nms[16] <- "lab_qualifier"
+nms[17] <- "qualifier"
+nms[18] <- "qual_description"
 nms
 
 ```
@@ -239,16 +255,19 @@ metadata$Description <-
     "Name of chemical or physical parameter.",
     "Value of the parameter.  Usually, but not always a concentration.",
     "Abbreviation of the units used.  Most are SI units of concentration.",
-    "EGAD's `VALIDATION QUALIFIER`.  This is a subset of the `LABORATORY QUALIFIER`.",
-    "Long description of meaning ofqualifiers.  Includes other qualifiers",
+    "Laboratory data qualifier. Sometimes caries non-detect flags missing in the next QUALIFIER.",
+    "EGAD's `VALIDATION QUALIFIER`.  This is usually a subset of the `LABORATORY QUALIFIER`.",
+    "Long description of meaning of Validation qualifiers.  Includes some other qualifiers.",
     "Reporting Limit.  Lab-determined value below which results are non-detects.",
-    "Method Detection Limit.  Official limit of method",
+    "Method Detection Limit.  Official limit of method.  Usually much lower than Reporting Limit.",
     "Basis for calculating concentration (wet weight, dry weight or lipid weight).",
     "Alphanumeric code for sample preparation methods.",
     "Dilution factor for sample analysis.  It's not clear whether this is useful.",
     "Chemical Abstract Number for chemical compound or mixture.",
     "Concentrations, expressed in micrograms per gram (or parts per million).",
-    "Concentrations expressed in nanograms per gram ( or parts per billion),")
+    "Concentrations expressed in nanograms per gram (or parts per billion),",
+    "Reporting limits, expressed in micrograms per gram (or parts per million).",
+    "Reporting limits expressed in nanograms per gram (or parts per billion),")
 
 kable(metadata)
 ```

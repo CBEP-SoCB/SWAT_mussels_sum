@@ -143,13 +143,12 @@ typographical or other errors.
 ```
 ## Metric Prefixes
 ```{r}
-prefixes <- "Prefix, Exponent
-N,  -9
-M,  -3
-K,  +3
-U,  -6
-P, -12"
-p <- as.tibble(read.csv(text = prefixes))
+p<- tribble(~Prefix, ~Exponent,
+'N',  -9,
+'M',  -3,
+'K',  +3,
+'U',  -6,
+'P', -12)
 # The following works, but is mighty ugly.  there must be a better way....
 p <- p %>% mutate(Multiplier = 10^Exponent) %>% arrange(Exponent)
 p
@@ -165,9 +164,10 @@ p
 That matches units in grams with related exponent.
 ```{r}
 find_exponent <- function (x){
-  if (nchar(x)==1) return(0)
-  pre <- substr(x,1,1)
-  if (pre %in% p$Prefix) {
+  x <- toupper(x)
+  if (nchar(x)==1) return(0)     # units are grams
+  pre <- substr(x,1,1)           # Otherwise the first character is a prefix
+  if (pre %in% p$Prefix) {       # and we can retrieve the exponent
      return(p$Exponent[p$Prefix == pre])
   }
   else
@@ -180,10 +180,14 @@ find_exponent("NG")
 conversions <- tibble(units = units, num = num, den = den) %>%
   mutate( numexp = unlist(lapply(num, find_exponent)),
           denexp = unlist(lapply(den, find_exponent)),
-          netexp = numexp-denexp) %>%
+          netexp = numexp-denexp,
+          conversion  = -netexp) %>%
   arrange(netexp)
 conversions
 ```
+To go from a measurement in grams per gram , to a measurement in one of these
+other sets of units, you multiply by the conversion
+
 
 
 # Express Data in Consistent Units
@@ -191,15 +195,19 @@ In other Analyses, we have used ug/g for metals and ng/g for organic
 contaminants.  So we will express concentrations in those units,
 extracting the correct conversion factors from the conversions table.
 
+The logic is, we go from units to g/g by multiplying by 10^netexp, and get from
+g/g to the desired units by multiplying by either 10^6 or 10^9.
+
+######## THIS IS UPSIDE DOWN! #########
 ```{r}
-uggexp <- -6
-nggexp <- -9
+uggexp <- 6  # to get from grams per gram to micrograms per gram, multiply by 10^6
+nggexp <- 9  # to get from grams per gram to nsnograms per gram, multiply by time 10^6
 
 test <- SWAT_simplified %>% 
   select(CONCENTRATION, `UNITS VALUE`) %>%
   mutate(theexp = conversions$netexp[match(`UNITS VALUE`, conversions$units)]) %>%
-  mutate(uggconvexp = uggexp - theexp,
-         nggconvexp = nggexp - theexp) %>%
+  mutate(uggconvexp =  theexp + uggexp,
+         nggconvexp =  theexp + nggexp) %>%
   mutate(conc_ugg = CONCENTRATION * 10^uggconvexp,
          conc_ngg = CONCENTRATION * 10^nggconvexp,) %>%
   select (-theexp, -uggconvexp, -nggconvexp)

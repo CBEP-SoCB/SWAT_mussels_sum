@@ -14,13 +14,16 @@ method_name,Name of method.
 parameter,Name of chemical or physical parameter.
 concentration,"Value of the parameter.  Usually, but not always a concentration."
 units,Abbreviation of the units used.  Most are SI units of concentration.
-qualifier,EGAD's `VALIDATION QUALIFIER`.  This is a subset of the `LABORATORY QUALIFIER`.
-qual_description,Long description of meaning ofqualifiers.  Includes other qualifiers
+lab_qualifier,Laboratory data qualifier. Sometimes caries non-detect flags missing in the next QUALIFIER.
+qualifier,EGAD's `VALIDATION QUALIFIER`.  This is usually a subset of the `LABORATORY QUALIFIER`.
+qual_description,Long description of meaning of Validation qualifiers.  Includes some other qualifiers.
 rl,Reporting Limit.  Lab-determined value below which results are non-detects.
-mdl,Method Detection Limit.  Official limit of method
+mdl,Method Detection Limit.  Official limit of method.  Usually much lower than Reporting Limit.
 weight_basis,"Basis for calculating concentration (wet weight, dry weight or lipid weight)."
 prep_method,Alphanumeric code for sample preparation methods.
 dilution_factor,Dilution factor for sample analysis.  It's not clear whether this is useful.
 cas_no,Chemical Abstract Number for chemical compound or mixture.
 conc_ugg,"Concentrations, expressed in micrograms per gram (or parts per million)."
-conc_ngg,"Concentrations expressed in nanograms per gram ( or parts per billion),"
+conc_ngg,"Concentrations expressed in nanograms per gram (or parts per billion),"
+rl_ugg,"Reporting limits, expressed in micrograms per gram (or parts per million)."
+rl_ngg,"Reporting limits expressed in nanograms per gram (or parts per billion),"

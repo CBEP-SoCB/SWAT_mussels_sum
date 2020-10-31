@@ -18,6 +18,7 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
         Units](#calculate-multipliers-for-units)
   - [Express Data in Consistent
     Units](#express-data-in-consistent-units)
+      - [THIS IS UPSIDE DOWN\!](#this-is-upside-down)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -71,7 +72,7 @@ theme_set
     ##     ggplot_global$theme_current <- new
     ##     invisible(old)
     ## }
-    ## <bytecode: 0x000000001659c400>
+    ## <bytecode: 0x0000000016599350>
     ## <environment: namespace:ggplot2>
 
 ``` r
@@ -596,22 +597,12 @@ typographical or other errors.
 ## Metric Prefixes
 
 ``` r
-prefixes <- "Prefix, Exponent
-N,  -9
-M,  -3
-K,  +3
-U,  -6
-P, -12"
-p <- as.tibble(read.csv(text = prefixes))
-```
-
-    ## Warning: `as.tibble()` is deprecated as of tibble 2.0.0.
-    ## Please use `as_tibble()` instead.
-    ## The signature and semantics have changed, see `?as_tibble`.
-    ## This warning is displayed once every 8 hours.
-    ## Call `lifecycle::last_warnings()` to see where this warning was generated.
-
-``` r
+p<- tribble(~Prefix, ~Exponent,
+'N',  -9,
+'M',  -3,
+'K',  +3,
+'U',  -6,
+'P', -12)
 # The following works, but is mighty ugly.  there must be a better way....
 p <- p %>% mutate(Multiplier = 10^Exponent) %>% arrange(Exponent)
 p
@@ -619,7 +610,7 @@ p
 
     ## # A tibble: 5 x 3
     ##   Prefix Exponent Multiplier
-    ##   <chr>     <int>      <dbl>
+    ##   <chr>     <dbl>      <dbl>
     ## 1 P           -12   1.00e-12
     ## 2 N            -9   1.00e- 9
     ## 3 U            -6   1.00e- 6
@@ -648,9 +639,10 @@ That matches units in grams with related exponent.
 
 ``` r
 find_exponent <- function (x){
-  if (nchar(x)==1) return(0)
-  pre <- substr(x,1,1)
-  if (pre %in% p$Prefix) {
+  x <- toupper(x)
+  if (nchar(x)==1) return(0)     # units are grams
+  pre <- substr(x,1,1)           # Otherwise the first character is a prefix
+  if (pre %in% p$Prefix) {       # and we can retrieve the exponent
      return(p$Exponent[p$Prefix == pre])
   }
   else
@@ -667,20 +659,24 @@ find_exponent("NG")
 conversions <- tibble(units = units, num = num, den = den) %>%
   mutate( numexp = unlist(lapply(num, find_exponent)),
           denexp = unlist(lapply(den, find_exponent)),
-          netexp = numexp-denexp) %>%
+          netexp = numexp-denexp,
+          conversion  = -netexp) %>%
   arrange(netexp)
 conversions
 ```
 
-    ## # A tibble: 6 x 6
-    ##   units num   den   numexp denexp netexp
-    ##   <chr> <chr> <chr>  <int>  <dbl>  <dbl>
-    ## 1 PG/G  PG    G        -12      0    -12
-    ## 2 NG/KG NG    KG        -9      3    -12
-    ## 3 NG/G  NG    G         -9      0     -9
-    ## 4 UG/KG UG    KG        -6      3     -9
-    ## 5 MG/KG MG    KG        -3      3     -6
-    ## 6 UG/G  UG    G         -6      0     -6
+    ## # A tibble: 6 x 7
+    ##   units num   den   numexp denexp netexp conversion
+    ##   <chr> <chr> <chr>  <dbl>  <dbl>  <dbl>      <dbl>
+    ## 1 PG/G  PG    G        -12      0    -12         12
+    ## 2 NG/KG NG    KG        -9      3    -12         12
+    ## 3 NG/G  NG    G         -9      0     -9          9
+    ## 4 UG/KG UG    KG        -6      3     -9          9
+    ## 5 MG/KG MG    KG        -3      3     -6          6
+    ## 6 UG/G  UG    G         -6      0     -6          6
+
+To go from a measurement in grams per gram , to a measurement in one of
+these other sets of units, you multiply by the conversion
 
 # Express Data in Consistent Units
 
@@ -688,15 +684,20 @@ In other Analyses, we have used ug/g for metals and ng/g for organic
 contaminants. So we will express concentrations in those units,
 extracting the correct conversion factors from the conversions table.
 
+The logic is, we go from units to g/g by multiplying by 10^netexp, and
+get from g/g to the desired units by multiplying by either 10^6 or 10^9.
+
+# THIS IS UPSIDE DOWN\!
+
 ``` r
-uggexp <- -6
-nggexp <- -9
+uggexp <- 6  # to get from grams per gram to micrograms per gram, multiply by 10^6
+nggexp <- 9  # to get from grams per gram to nsnograms per gram, multiply by time 10^6
 
 test <- SWAT_simplified %>% 
   select(CONCENTRATION, `UNITS VALUE`) %>%
   mutate(theexp = conversions$netexp[match(`UNITS VALUE`, conversions$units)]) %>%
-  mutate(uggconvexp = uggexp - theexp,
-         nggconvexp = nggexp - theexp) %>%
+  mutate(uggconvexp =  theexp + uggexp,
+         nggconvexp =  theexp + nggexp) %>%
   mutate(conc_ugg = CONCENTRATION * 10^uggconvexp,
          conc_ngg = CONCENTRATION * 10^nggconvexp,) %>%
   select (-theexp, -uggconvexp, -nggconvexp)
@@ -704,15 +705,15 @@ head(test,10)
 ```
 
     ## # A tibble: 10 x 4
-    ##    CONCENTRATION `UNITS VALUE` conc_ugg conc_ngg
-    ##            <dbl> <chr>            <dbl>    <dbl>
-    ##  1         8.1   NG/G           8100     8.1    
-    ##  2         0.238 NG/G            238     0.238  
-    ##  3         1.51  NG/G           1510     1.51   
-    ##  4        19.3   NG/G          19300    19.3    
-    ##  5      1200.    MG/KG          1200.    1.20   
-    ##  6         1     TRUE/FALSE       NA    NA      
-    ##  7        16.6   %                NA    NA      
-    ##  8         2.24  MG/KG             2.24  0.00224
-    ##  9        13.5   MG/KG            13.5   0.0135 
-    ## 10       182.    MG/KG           182.    0.182
+    ##    CONCENTRATION `UNITS VALUE`    conc_ugg    conc_ngg
+    ##            <dbl> <chr>               <dbl>       <dbl>
+    ##  1         8.1   NG/G             0.0081         8.1  
+    ##  2         0.238 NG/G             0.000238       0.238
+    ##  3         1.51  NG/G             0.00151        1.51 
+    ##  4        19.3   NG/G             0.0193        19.3  
+    ##  5      1200.    MG/KG         1200.       1199838.   
+    ##  6         1     TRUE/FALSE      NA             NA    
+    ##  7        16.6   %               NA             NA    
+    ##  8         2.24  MG/KG            2.24        2240    
+    ##  9        13.5   MG/KG           13.5        13510.   
+    ## 10       182.    MG/KG          182.        181597.
