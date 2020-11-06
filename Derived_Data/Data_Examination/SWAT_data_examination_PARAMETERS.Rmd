@@ -118,11 +118,12 @@ One of the challenges is that we want to report totals of various groups of
 parameters, but the data contains no flag for major groups of parameters.
 
 The closest thing to an indicator of the groupings of parameters in use is the
-`TEST METHOD` field. We generate a pretty good starting point for a lookup
+`TEST METHOD` field. We generated a pretty good starting point for a lookup
 table to assign parameters to groups based on the `TEST METHOD`.
 
-We then export that list to Excel, and edit it by hand to assign parameters to 
+We then exported that list to Excel, and edit it by hand to assign parameters to 
 groups.
+
 
 ## Develop a Preliminary list of Parameters
 ```{r}
@@ -135,9 +136,16 @@ SWAT_simplified %>%
   select(-Test) %>%
   kable()
 ```
+Some of the PAH values marked as "Calculated", especially the groups of PAHs
+designated  with a "C-" value may not always represent calculations. In 
+standard practice, those values are aggregates of substituted PAHs, either
+calculated or not. Not all the subcomponent PAHs for these sums appear in the
+data, so it is not clear that these are all simple calculations rather than
+data in their own right.
 
 ##  Read Excel File with Classification of Parameters
-We can then read in the resulting Excel File to provide groupings...
+We loaded a version of the preceding table into Excel, and hand edited it to
+provide useful groupings of parameters.  here we read that list back into R.
 ```{r}
 Parameter_List <- read_excel(file.path(parent,"Parameter List.xlsx"), 
     sheet = "Parameter List") %>%
@@ -149,13 +157,15 @@ Parameter_List
 ## Add Class to the Working Simplified Data
 ```{r}
 SWAT_simplified <- SWAT_simplified %>% 
-  mutate(Class = Parameter_List$Class[match(PARAMETER, Parameter_List$PARAMETER)])
+  mutate(Class = Parameter_List$Class[match(PARAMETER,
+                                            Parameter_List$PARAMETER)])
 ```
 
 ## How are contaminant classes distributed among sampling events?
 ```{r}
 SWAT_simplified %>% 
   group_by(SiteCode, SAMPLE_DATE, Class) %>%
+  mutate(class = factor(Class)) %>%
   summarize(n = sum(! is.na(CONCENTRATION)),
             .groups = 'drop') %>%
   pivot_wider(names_from = Class, values_from = n, values_fill = 0) %>%

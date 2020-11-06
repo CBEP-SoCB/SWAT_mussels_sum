@@ -5,6 +5,8 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
 
   - [Introduction](#introduction)
   - [Load Libraries](#load-libraries)
+  - [Utility Function](#utility-function)
+      - [Add\_if\_list](#add_if_list)
   - [Load Data](#load-data)
       - [Establish Folder Reference](#establish-folder-reference)
       - [Copy Data](#copy-data)
@@ -13,9 +15,30 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
         Codes](#simplify-data-and-add-unique-sample-codes)
       - [Add Class to the Working Simplified
         Data](#add-class-to-the-working-simplified-data)
+  - [Create PCB-only Data](#create-pcb-only-data)
+  - [PCB Reference Levels](#pcb-reference-levels)
+  - [PCB Totals](#pcb-totals)
+      - [When are Each of the Totals
+        Available?](#when-are-each-of-the-totals-available)
+      - [Compare the two Totals](#compare-the-two-totals)
+      - [Conclusion:](#conclusion)
   - [PCB Nomenclature](#pcb-nomenclature)
-      - [Examining CAS numbers](#examining-cas-numbers)
-  - [When Does Each Total Exist?](#when-does-each-total-exist)
+      - [Load PCB Nomenclature Table](#load-pcb-nomenclature-table)
+      - [Developing Consistent Nomenclature based on PCB Congener
+        Numbers](#developing-consistent-nomenclature-based-on-pcb-congener-numbers)
+      - [Add Congener Number to PCB Names
+        Data](#add-congener-number-to-pcb-names-data)
+      - [Add Congener Number to PCB
+        Data](#add-congener-number-to-pcb-data)
+  - [Calculating Reference Sums.](#calculating-reference-sums.)
+      - [Load Parameter ListS](#load-parameter-lists)
+      - [A Caution](#a-caution)
+      - [Compare Parameter Lists for Presence of
+        Congeners](#compare-parameter-lists-for-presence-of-congeners)
+      - [Test for Missing Parameters.](#test-for-missing-parameters.)
+      - [Calculate the SWAT Sum](#calculate-the-swat-sum)
+  - [Compare SWAT Sum to 2017 published
+    Results](#compare-swat-sum-to-2017-published-results)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -35,11 +58,26 @@ dates from 20 locations, over a period of more than 15 years.
 Unfortunately, the data delivery contains limited metadata, so it takes
 some effort to understand the data format and analyze it correctly.
 
-In this notebook we review the parameters identified in the data and
-assign them to groups to facilitate analysis. We also check on a number
-of technical matters dealing with how various totals were calculated.
-These include: \* Figuring out which compounds were included in various
-totals \* Determining how NOn-detects were included in totals
+In this notebook we review the parameters identified in the data related
+to PCBs. We focus on a number of technical matters dealing with how
+totals were calculated. These include:  
+\* Figuring out which compounds were included in various totals.  
+\* Determining how non-detects were included in totals.
+
+DEP staff pointed us towards the detailed documentation in the 2017-2018
+SWAT data report for details of how totals were calculated. This
+provided a detailed list of parameters used to summarize PCBs using
+analytic totals that can be compared on a more or less consistent basis
+with benchmarks from Gulfwatch and NOAA’s National Status and Trends
+studies.
+
+> Maine Department of Environmental Protection. 2019. Surface Water
+> Ambient Toxics Monitoring Program. 2017-2018 Report to the Joint
+> Committee on Environmental and Natural Resources. 129th Legislature,
+> First Session.
+
+The central challenge here relates to comparing and calculating various
+totals either included or not included in the original data.
 
 # Load Libraries
 
@@ -47,14 +85,14 @@ totals \* Determining how NOn-detects were included in totals
 library(tidyverse)
 ```
 
-    ## -- Attaching packages --------------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages ----------------------------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts ------------------------------------------------------------------------------------------ tidyverse_conflicts() --
+    ## -- Conflicts -------------------------------------------------------------- tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -62,6 +100,45 @@ library(tidyverse)
 library(readxl)
 library(htmltools)  # used by knitr called here only to avoid startup text later
 library(knitr)
+
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set(theme_cbep())
+
+library(LCensMeans)
+```
+
+# Utility Function
+
+## Add\_if\_list
+
+The following function wraps calculation of sums of items based on
+inclusion in a list into a function and provides useful diagnostic
+warnings. A function is especially useful for incorporation into a
+pipeline that relies on grouped dataframes, or using sapply or lapply.
+The error messages would be more informative if they provided
+information on which sample the missing data was associated with.
+
+We don’t actually end up using this function in the current
+(4/11/2020)version of the notebook, but we keep it here in case we need
+it later during revisions.
+
+``` r
+add_if_list <- function(parms, vals, sel) {
+  # parms -- vector of parameter names associated with specific values
+  # vals  -- data, some of which you want to add together, based on parm value
+  # sel   -- vector of strings indicating which
+  # 
+  stopifnot(length(parms) == length(vals),  # each value has a parameter name
+            ! is.null(labs) | length(parms) == length(labs), # and labels too, if given
+            typeof(parms) == typeof(sel))   # crude test for compatibiity
+  if (! all(sel %in% parms)) {
+    miss <- sel[! (sel %in% parms)]
+      warning('The following parameters are missing:\n')
+      walk(miss, function(X) warning('\t', X, '\n'))
+  }
+  sum(vals[parms %in% sel], na.rm = TRUE)
+}
 ```
 
 # Load Data
@@ -140,11 +217,14 @@ SWAT_simplified <- SWAT_data %>%
   select    (-sample_id, -tag) %>%
   select    (`SITE SEQ`, SiteCode, Site, Year, SAMPLE_DATE,
               SAMPLE_ID, Code, everything())
+
+rm(SWAT_data)
 ```
 
 ## Add Class to the Working Simplified Data
 
-We can then read in the resulting Excel File to provide groupings…
+We read data from the `Parameter List.xlsx` Excel File to provide
+groupings.
 
 ``` r
 Parameter_List <- read_excel(file.path(parent,"Parameter List.xlsx"), 
@@ -154,147 +234,984 @@ Parameter_List <- read_excel(file.path(parent,"Parameter List.xlsx"),
 
 SWAT_simplified <- SWAT_simplified %>% 
   mutate(Class = Parameter_List$Class[match(PARAMETER, Parameter_List$PARAMETER)])
+rm(Parameter_List)
 ```
 
-# PCB Nomenclature
+# Create PCB-only Data
 
-Many of the PCBs chemical names and the PCB numerical designations turn
-up in the same number of composite samples, which suggests they are
-reported on the same samples. I wonder if these represent duplicate
-data.
-
-## Examining CAS numbers
-
-Lets see how many times we have duplicate values with the same CAS
-number.
+But want to restrict to PCB data only, expressed on a dry weight basis.
+We had trouble because we lost certain parameters in deriving this data
+subset, presumably when we selected only dry weigh basis samples.
 
 ``` r
-SWAT_simplified %>% 
- # filter(`WEIGHT BASIS` == 'LIP') %>%
-  group_by(CAS_NO) %>%
-  filter(grepl('PCB', Class)) %>%
-  summarize(nnames = length(unique(PARAMETER)),
-            name = first (PARAMETER),
-            .groups = 'drop') %>%
-  arrange(name)
+pcb_data_1 <- SWAT_simplified %>%
+  filter(grepl('PCB', Class))
 ```
-
-    ## # A tibble: 178 x 3
-    ##    CAS_NO   nnames name                                    
-    ##    <chr>     <int> <chr>                                   
-    ##  1 65510443      1 2',3,4,4',5-PENTACHLOROBIPHENYL         
-    ##  2 2051607       1 2-CHLOROBIPHENYL                        
-    ##  3 13029088      1 2,2'-DICHLOROBIPHENYL                   
-    ##  4 38444789      1 2,2',3-TRICHLOROBIPHENYL                
-    ##  5 52663624      1 2,2',3,3',4-PENTACHLOROBIPHENYL         
-    ##  6 35065306      1 2,2',3,3',4,4',5-HEPTACHLOROBIPHENYL    
-    ##  7 35694087      1 2,2',3,3',4,4',5,5'-OCTACHLOROBIPHENYL  
-    ##  8 40186729      1 2,2',3,3',4,4',5,5',6-NONACHLOROBIPHENYL
-    ##  9 42740501      1 2,2',3,3',4,4',5,6'-OCTACHLOROBIPHENYL  
-    ## 10 52663782      1 2,2',3,3',4,4',5,6-OCTACHLOROBIPHENYL   
-    ## # ... with 168 more rows
-
-So we have no duplicates.
-
-All the PCBs listed by PCB number are in fact mixtures of PCBs. So
-technically, they are NOT individual PCBs. The question is, how are they
-used? And especially, how are the total PCBs calculated?
-
-WE zero in on a few parameters that either emphasize PCB names
-(mixtures) or chemical nomenclature (individual compounds).
 
 ``` r
-SWAT_simplified %>% 
-  select(Code, `TEST METHOD`, Year, ANALYSIS_LAB_SAMPLE_ID, `WEIGHT BASIS`,
-         PARAMETER, CONCENTRATION, Class) %>%
-  filter (`WEIGHT BASIS` == 'WET') %>%
-  filter(grepl('PCB', Class)) %>%
-  pivot_wider(names_from = PARAMETER, values_from = CONCENTRATION) %>%
-  select(-ANALYSIS_LAB_SAMPLE_ID, -Class, -Code) %>%
-  select(sort(current_vars())) %>%
-  select(`TEST METHOD`, Year, everything()) %>%
-  select(1,2, 135:145) %>%
-  arrange(Year)
+pcb_data_2 <- pcb_data_1 %>%
+  filter(`WEIGHT BASIS` == 'WET')
 ```
 
-    ## Warning: `current_vars()` is deprecated as of dplyr 0.8.4.
-    ## Please use `tidyselect::peek_vars()` instead.
-    ## This warning is displayed once every 8 hours.
-    ## Call `lifecycle::last_warnings()` to see where this warning was generated.
+``` r
+pcb_data_3 <- pcb_data_1 %>%
+  filter(`WEIGHT BASIS` == 'DRY')
+```
 
-    ## # A tibble: 471 x 13
-    ##    `TEST METHOD`  Year `4-CHLOROBIPHEN~ `4,4'-DICHLOROB~ DECACHLOROBIPHE~
-    ##    <chr>         <dbl>            <dbl>            <dbl>            <dbl>
-    ##  1 E1668A         2003               NA               NA               NA
-    ##  2 E1668A         2003               NA               NA               NA
-    ##  3 E1668A         2003               NA               NA               NA
-    ##  4 E1668A         2003               NA               NA               NA
-    ##  5 E1613          2003               NA               NA               NA
-    ##  6 E1613          2003               NA               NA               NA
-    ##  7 E1668A         2003               NA               NA               NA
-    ##  8 E1668A         2003               NA               NA               NA
-    ##  9 E1613          2003               NA               NA               NA
-    ## 10 E1668A         2003               NA               NA               NA
-    ## # ... with 461 more rows, and 8 more variables: `PCB-012/013` <dbl>,
-    ## #   `PCB-018/030` <dbl>, `PCB-020/028` <dbl>, `PCB-021/033` <dbl>,
-    ## #   `PCB-026/029` <dbl>, `PCB-040/041/071` <dbl>, `PCB-044/047/065` <dbl>,
-    ## #   `PCB-045/051` <dbl>
+``` r
+pcb_data_4 <- pcb_data_1 %>%
+  filter(`WEIGHT BASIS` == 'LIP')
+```
 
-It does, generally appear that samples EITHER provide data on individual
-PCBs or on co-eluted PCBs. But interestingly, almost all samples
-indicate to the same `TEST METHOD`, E1613, or E1613A. There is no
-obvious pattern with respect to when the sample was collected.
+``` r
+a  <- levels(factor(pcb_data_1$PARAMETER))
+b  <- levels(factor(pcb_data_2$PARAMETER))
+c  <- levels(factor(pcb_data_3$PARAMETER))
+d  <- levels(factor(pcb_data_4$PARAMETER))
 
-We are unlikely to be able to resolve this discrepancy “after the fact”.
-We next turn to looking at the PCB totals reported in the ata
+length(a)
+```
 
-# When Does Each Total Exist?
+    ## [1] 177
 
-We look narrowly at WET weights and totals that treat non-detects as
-zero. We make the assumption for now that the lessons learned from that
-subset apply to the related data.
+``` r
+length(b)
+```
+
+    ## [1] 177
+
+``` r
+length(c)
+```
+
+    ## [1] 166
+
+``` r
+length(d)
+```
+
+    ## [1] 166
+
+So, by restricting to dry weight only, certain parameters vanish
+entirely. That makes little sense.
+
+``` r
+a[! a %in% c]
+```
+
+    ##  [1] "2,2',3,3',5-PENTACHLOROBIPHENYL"     
+    ##  [2] "2,2',3,4,4',5,5'-HEPTACHLOROBIPHENYL"
+    ##  [3] "2,2',3,5',6-PENTACHLOROBIPHENYL"     
+    ##  [4] "2,2',4,4',5-PENTACHLOROBIPHENYL"     
+    ##  [5] "2,2',4,4',5,6'-HEXACHLOROBIPHENYL"   
+    ##  [6] "2,3,3',4,4',5'-HEXACHLOROBIPHENYL"   
+    ##  [7] "2,3,3',4,4',5-HEXACHLOROBIPHENYL"    
+    ##  [8] "2,3,3',4,5,6-HEXACHLOROBIPHENYL"     
+    ##  [9] "PCB-093/098/100/102"                 
+    ## [10] "PCB-129/138/163"                     
+    ## [11] "PCB-135/151"
+
+``` r
+pcb_data_1 %>%
+  filter(PARAMETER %in% a[! a %in% c]) %>%
+  select(Code, `ANALYSIS LAB`, PARAMETER, CONCENTRATION,
+         `LAB QUALIFIER`, RL, `WEIGHT BASIS`) %>%
+  arrange(Code)
+```
+
+    ## # A tibble: 80 x 7
+    ##    Code  `ANALYSIS LAB` PARAMETER CONCENTRATION `LAB QUALIFIER`    RL
+    ##    <chr> <chr>          <chr>             <dbl> <chr>           <dbl>
+    ##  1 CBFR~ PACE ANALYTIC~ 2,2',3,5~         594   <NA>             NA  
+    ##  2 CBFR~ PACE ANALYTIC~ PCB-093/~          35.1 <NA>             NA  
+    ##  3 CBFR~ PACE ANALYTIC~ 2,2',3,3~          40   <NA>             NA  
+    ##  4 CBFR~ PACE ANALYTIC~ 2,2',4,4~         549   <NA>             NA  
+    ##  5 CBFR~ PACE ANALYTIC~ PCB-135/~         417   <NA>             NA  
+    ##  6 CBFR~ PACE ANALYTIC~ 2,2',4,4~          20.4 <NA>             NA  
+    ##  7 CBFR~ PACE ANALYTIC~ PCB-129/~        1670   <NA>             NA  
+    ##  8 CBFR~ PACE ANALYTIC~ 2,3,3',4~          NA   U                16.7
+    ##  9 CBFR~ PACE ANALYTIC~ 2,2',3,5~         346   <NA>             NA  
+    ## 10 CBFR~ PACE ANALYTIC~ PCB-093/~          NA   U                25  
+    ## # ... with 70 more rows, and 1 more variable: `WEIGHT BASIS` <chr>
+
+These are ALL 2003 data, and all PACE ANALYTICAL Laboratory. The PCB
+data from later years is is from AXYS ANALYTICAL SERVICES.
+
+One possibility is that these parameters were only available from PACE,
+but that PACE did not provide moisture data, or moisture data was not
+recorded from those early years. In the absence of moisture data, you
+can not calculate dry weight values.
+
+We can look at the data from one sample and review all parameters
+available. IF the data lacks basic physical parameters, like moisture,
+that may explain the discrepancy.
 
 ``` r
 SWAT_simplified %>%
-  select(Code, ANALYSIS_LAB_SAMPLE_ID, `TEST METHOD`, `WEIGHT BASIS`,
-         PARAMETER, CONCENTRATION) %>%
-  filter (`WEIGHT BASIS` == 'WET') %>%
-  filter(grepl("PCB", PARAMETER)) %>%
-  filter(grepl("TOTAL", PARAMETER) |
-           grepl('TEQ', PARAMETER) |
-           grepl('CALCULATED', `TEST METHOD`)) %>%
-  pivot_wider(names_from = PARAMETER, values_from = CONCENTRATION)
+  filter(Code == 'CBFROR_REP_1_2003_4') %>%
+  select(PARAMETER, `WEIGHT BASIS`, Class) %>%
+  arrange(Class, PARAMETER)
 ```
 
-    ## # A tibble: 195 x 11
-    ##    Code  ANALYSIS_LAB_SA~ `TEST METHOD` `WEIGHT BASIS` `PCB TOTAL TEQ ~
-    ##    <chr> <chr>            <chr>         <chr>                     <dbl>
-    ##  1 CBJW~ L10702-41        E1668A        WET                      0.077 
-    ##  2 CBJW~ L10702-42        E1668A        WET                      0.073 
-    ##  3 CBJW~ L10702-43        E1668A        WET                      0.093 
-    ##  4 CBJW~ L10702-44        E1668A        WET                      0.074 
-    ##  5 CBAN~ L10702-1         E1668A        WET                      0.0171
-    ##  6 CBAN~ L10702-2         E1668A        WET                      0.213 
-    ##  7 CBAN~ L10702-3 (A)     E1668A        WET                      0.25  
-    ##  8 CBAN~ L10702-4         E1668A        WET                      0.2   
-    ##  9 CBMC~ MILL CREEK, FAL~ E1668A        WET                      0.275 
-    ## 10 CBMC~ L13939-9         CALCULATED W~ WET                      0.226 
-    ## # ... with 185 more rows, and 6 more variables: `PCB TOTAL TEQ (ND=1/2
-    ## #   DL)` <dbl>, `PCB TOTAL TEQ (ND=DL)` <dbl>, `TOTAL PCB-H` <dbl>, `TOTAL
-    ## #   PCB-O` <dbl>, `TOTAL PCB-D` <dbl>, PCBS <dbl>
+    ## # A tibble: 221 x 3
+    ##    PARAMETER `WEIGHT BASIS` Class
+    ##    <chr>     <chr>          <fct>
+    ##  1 ALUMINUM  WET            Metal
+    ##  2 CADMIUM   WET            Metal
+    ##  3 CHROMIUM  WET            Metal
+    ##  4 COPPER    WET            Metal
+    ##  5 IRON      WET            Metal
+    ##  6 LEAD      WET            Metal
+    ##  7 MERCURY   WET            Metal
+    ##  8 NICKEL    WET            Metal
+    ##  9 SELENIUM  WET            Metal
+    ## 10 SILVER    WET            Metal
+    ## # ... with 211 more rows
 
-We appear to have THREE different types of totals:
+So that appears to be the case. This sample, at least, has no moisture
+or lipid data, so data can not be re-expressed on a dry-weight basis.
 
-1.  PCB TOTAL TEQ  
-2.  TOTAL PCB  
-3.  PCBs
+It is not clear why these parameters are not available from Axys. We
+will explore that later.
 
-<!-- end list -->
+We accept that we can not use the 2003 PCB data because it can not be
+expressed on a dry-weight basis, and create a reduced PCBs data set here
 
-  - Groups 1 and 2 co-occur sometimes, but not always.
-  - Group 3 appears to always occur with Group 1, and never with Group
-    2.
-  - Groups 2 and 3 appear disjoint.
+``` r
+pcb_data <- pcb_data_3
+rm(pcb_data_1, pcb_data_2, pcb_data_3, pcb_data_4)
+```
 
-None of these make it obvious which PCBs were included in the sum to
-calculate “totals”.
+# PCB Reference Levels
+
+There is no simple way to establish toxicity benchmarks for edible
+tissue. Maine DEP compares values of analytic totals to prevalence
+benchmarks (medians and 85th percentiles) derived from the Gulfwatch and
+National Status And trends monitoring programs, as published by Leblanc
+et al. 2009.
+
+> Leblanc, L.A., Krahforst, C.F., Aubé, J., Roach, S., Brun, G.,
+> Harding, G., Hennigar, P., Page, D., Jones, S., Shaw, S., Stahlnecker,
+> J., Schwartz, J., Taylor, D., Thorpe, B., & Wells, P. (2009).
+> Eighteenth Year of the Gulf of Maine Environmental Monitoring Program.
+
+We copied benchmark tables from (an on-line version of) Leblanc et
+al. 2009 into our excel spreadsheet, and read those benchmarks in here.
+
+``` r
+references <- read_excel(file.path(parent,"Parameter List.xlsx"), 
+                             sheet = "Organic Comparisons",
+                         range = 'a3:f8') %>%
+  rename('Reference_ngg' = ...1) %>%
+  filter(! is.na(Reference_ngg))
+```
+
+    ## New names:
+    ## * `` -> ...1
+
+The trick is, these benchmarks are based on a subset of all PCBs studied
+over the years. To use these references, we need to calculate similar
+sums. They were not provided in teh EGAD data.
+
+# PCB Totals
+
+We look narrowly at DRY weights and totals that treat non-detects as one
+half the Reporting Limit. We make the assumption for now that the
+lessons learned from that subset apply to related data.
+
+``` r
+SWAT_simplified %>%
+  filter(((grepl('TOTAL', PARAMETER) &
+             grepl('PCB', PARAMETER) ) &
+         (grepl('ND=1\\/2 DL', PARAMETER) |
+             grepl('-H$', PARAMETER))) |
+           PARAMETER == 'PCBS')  %>%
+  select(PARAMETER) %>%
+  unique()
+```
+
+    ## # A tibble: 3 x 1
+    ##   PARAMETER                
+    ##   <chr>                    
+    ## 1 PCB TOTAL TEQ (ND=1/2 DL)
+    ## 2 TOTAL PCB-H              
+    ## 3 PCBS
+
+We have two different PCB totals, ‘TOTAL PCB-H’, and ‘PCBS’, and one
+total based on toxic equivalents. It is not immediately obvious what the
+two totals represent. The nomenclature does not map onto the values
+reported by DEP or included in the Leblanc et al. 2009 reference levels.
+
+The SWAT report discusses “SWAT PCBs” or “\(\Sigma35\) PCBS” on the one
+hand, or “Gulfwatch”, “NS\&T”, or “\(\Sigma31\) PCBS” on the other. It
+is not immediately obvious how any of the totals we have available
+relate to those categories.
+
+We need to figure out whether and how the two totals compare to the
+NS\&T and Gulfwatch reference figures we have available, which were
+called “PCB21” in the Leblanc et al. reference.
+
+One clue comes from a paragraph on page 75 of the SWAT report: \> Figure
+1.3.3.1.1 compares the SWAT PCBs (Σ35 PCBs) at the 2017 SWAT mussel
+sites to Gulfwatch median and 85th percentile for 2008 PCB data, the
+most recent available. Of the three SWAT mussel sites, only East End
+Beach, Portland, exceeded the Gulfwatch 2008 median of 24.1 ng/g dry
+wt., and none of the sites tested exceeded the Gulfwatch 85th percentile
+of 35.4 ng/g dry wt. for Gulfwatch PCBs.
+
+The values quoted:  
+\* Gulfwatch 2008 median of 24.1 ng/g dry weight and  
+\* Gulfwatch 85th percentile of 35.4  
+Match the values from Leblanc et al. 2009 for PCB21.
+
+A list of the PCBs included in each of the reference totals is provided
+in table 1.3.3.1.1 in the report, which is duplicated in `Parameter
+List.xlsx`. A simple list of PCBs in each reference total is also
+provided, in the “PCB\_SWAT” and “PCB\_Gulfwatch” tabs.
+
+Now we need to confirm that the totals we have match the totals shown
+graphically on the 2017 report averages. Let’s look at averages and SDs
+from 2017 data.
+
+``` r
+pcb_totals <- SWAT_simplified %>%
+  filter(`WEIGHT BASIS` == 'DRY') %>%
+  filter((PARAMETER == 'TOTAL PCB-H') |
+          (PARAMETER == 'PCBS'))
+```
+
+``` r
+pcb_totals %>%
+  filter(Year == 2017) %>%
+  select(SiteCode, SAMPLE_ID, ANALYSIS_LAB_SAMPLE_ID, CONCENTRATION, Year, PARAMETER) %>%
+  group_by(Year, SiteCode, PARAMETER) %>%
+  summarize(mn =  mean(CONCENTRATION),
+            stdev = sd(CONCENTRATION))
+```
+
+    ## `summarise()` regrouping output by 'Year', 'SiteCode' (override with `.groups` argument)
+
+    ## # A tibble: 4 x 5
+    ## # Groups:   Year, SiteCode [2]
+    ##    Year SiteCode PARAMETER       mn stdev
+    ##   <dbl> <chr>    <chr>        <dbl> <dbl>
+    ## 1  2017 CBEEEE   PCBS        64583. 4698.
+    ## 2  2017 CBEEEE   TOTAL PCB-H 64835. 4701.
+    ## 3  2017 CBMCMC   PCBS        42170  5833.
+    ## 4  2017 CBMCMC   TOTAL PCB-H 42397. 5775.
+
+Those means are very close to the means reported (graphically) in the
+DEP report for “Total PCBs” Neither is close to the Gulfwatch or SWAT
+PCB totals, which are about 40% as large. The values of hte two totals
+are too close to tell which is the better match for the values in the
+Report graph.
+
+If we want values we can compare to reference benchmarks, we have to
+recalculate them.
+
+## When are Each of the Totals Available?
+
+“TOTAL PCB-H” are available most of the time.
+
+``` r
+xtabs(~ SiteCode + Year , data = pcb_data,
+      subset = PARAMETER == 'TOTAL PCB-H')
+```
+
+    ##         Year
+    ## SiteCode 2007 2008 2009 2010 2011 2012 2013 2014 2015 2017
+    ##   CBANAN    4    0    0    0    0    0    0    0    0    0
+    ##   CBEEEE    4    0    4    0    5    0    4    0    4    3
+    ##   CBFRIR    0    0    4    0    0    0    0    0    0    0
+    ##   CBFRMR    4    0    0    0    0    0    0    0    0    0
+    ##   CBHRHR    4    0    0    0    0    0    0    0    0    0
+    ##   CBHWNP    0    0    0    0    0    0    0    4    0    0
+    ##   CBJWPB    4    0    0    0    0    0    0    0    0    0
+    ##   CBLNFT    0    0    4    0    0    0    0    0    0    0
+    ##   CBMBBH    4    0    0    0    0    0    0    4    0    0
+    ##   CBMBBR    0    0    4    0    0    0    0    0    0    0
+    ##   CBMBMB    0    4    0    0    0    0    0    0    0    0
+    ##   CBMCMC    0    0    4    0    4    0    0    3    0    4
+    ##   CBPRMT    0    4    0    0    0    0    0    0    0    0
+    ##   CBQHQH    0    0    5    0    0    0    0    0    0    0
+    ##   CBSPSP    4    0    0    4    0    4    0    0    4    0
+
+PCBs are available slightly less often – fewer sites, and fewer years.
+Principally, “TOTAL PCB-H” was used in 2007 and 2008.
+
+``` r
+xtabs(~ SiteCode + Year , data = pcb_data,
+      subset = PARAMETER == 'PCBS')
+```
+
+    ##         Year
+    ## SiteCode 2009 2010 2011 2012 2013 2014 2015 2017
+    ##   CBEEEE    4    0    4    0    4    0    4    3
+    ##   CBFRIR    4    0    0    0    0    0    0    0
+    ##   CBHWNP    0    0    0    0    0    4    0    0
+    ##   CBLNFT    4    0    0    0    0    0    0    0
+    ##   CBMBBH    0    0    0    0    0    4    0    0
+    ##   CBMBBR    4    0    0    0    0    0    0    0
+    ##   CBMCMC    4    0    4    0    0    3    0    4
+    ##   CBQHQH    4    0    0    0    0    0    0    0
+    ##   CBSPSP    0    4    0    4    0    0    4    0
+
+## Compare the two Totals
+
+``` r
+pcb_data %>%
+  select(SiteCode, SAMPLE_ID, ANALYSIS_LAB_SAMPLE_ID, CONCENTRATION, Year, PARAMETER) %>%
+  pivot_wider(names_from = PARAMETER, values_from = CONCENTRATION) %>%
+  group_by(Year) %>%
+  summarize(`TOTAL PCB-H` = mean(`TOTAL PCB-H`),
+            `PCBS`        = mean(`PCBS`),
+            diff = `TOTAL PCB-H`- `PCBS`)
+```
+
+    ## `summarise()` ungrouping output (override with `.groups` argument)
+
+    ## # A tibble: 10 x 4
+    ##     Year `TOTAL PCB-H`   PCBS  diff
+    ##    <dbl>         <dbl>  <dbl> <dbl>
+    ##  1  2007        52868.    NA   NA  
+    ##  2  2008        42721.    NA   NA  
+    ##  3  2009        59663.    NA   NA  
+    ##  4  2010        70167. 69925  242. 
+    ##  5  2011        40808.    NA   NA  
+    ##  6  2012        57500. 57475   24.9
+    ##  7  2013        59392. 59352.  39.6
+    ##  8  2014        25146. 25103.  43.0
+    ##  9  2015        61231. 61196.  34.4
+    ## 10  2017        52013. 51776. 238.
+
+In general, TOTAL PCB-H is slightly higher, as shown by differences of
+annual averages.
+
+``` r
+pcb_data %>%
+  select(SiteCode, SAMPLE_ID, ANALYSIS_LAB_SAMPLE_ID, CONCENTRATION, Year, PARAMETER) %>%
+  pivot_wider(names_from = PARAMETER, values_from = CONCENTRATION) %>%
+  rowwise() %>%
+  mutate(diff = `TOTAL PCB-H`- `PCBS`) %>%
+  pull(diff) %>%
+  summary()
+```
+
+    ##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max.      NA's 
+    ## -37399.48     30.72     44.23   -690.16     92.80    563.36        38
+
+And that is true of the median as well, but the mean difference sample
+by sample is dominated by a few very large differences going the other
+way.
+
+Note, we have at least one laboratory duplicate in here, so we need to
+include the ANALYSIS\_LAB\_SAMPLE\_ID as part of the id\_cols for the
+pivot wider command.
+
+``` r
+plt <- pcb_data %>%
+  select(SiteCode, SAMPLE_ID, ANALYSIS_LAB_SAMPLE_ID, CONCENTRATION, Year, PARAMETER) %>%
+  pivot_wider(names_from = PARAMETER, values_from = CONCENTRATION) %>%
+  ggplot(aes(`TOTAL PCB-H`, `PCBS`)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0) +
+  theme_cbep(base_size = 12)
+plt
+```
+
+    ## Warning: Removed 38 rows containing missing values (geom_point).
+
+![](SWAT_data_examination_PCBs_2_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+The two Totals, where we have both, are NEARLY identical. “TOTAL PCB-H”
+is, on average, higher in every sample, but there are two samples where
+`PCBs` were much higher. That could be some sort of an error, but there
+is no way, *a priori*, to figure it out for sure without recalculating
+our own totals, which we are trying to avoid.
+
+We can look at ranges at site and Year sample codes…
+
+``` r
+pcb_data %>%
+  filter(PARAMETER == 'TOTAL PCB-H') %>%
+  group_by(Year, SiteCode) %>%
+  summarize(rng = max(CONCENTRATION) - min(CONCENTRATION)) %>%
+  pull(rng) %>%
+  sort()
+```
+
+    ## `summarise()` regrouping output by 'Year' (override with `.groups` argument)
+
+    ##  [1]  1002.458  1465.719  1745.703  1795.640  2037.264  2462.079  3287.329
+    ##  [8]  3790.916  4062.937  4217.193  4230.372  4930.873  6401.125  8232.957
+    ## [15]  8438.251  8999.414 12598.727 12913.418 13078.184 13767.520 17100.405
+    ## [22] 17746.328 24024.417 24060.631 41533.148 51717.080 59662.470
+
+``` r
+pcb_data %>%
+  filter(PARAMETER == 'PCBS') %>%
+  group_by(Year, SiteCode) %>%
+  summarize(rng = max(CONCENTRATION) - min(CONCENTRATION)) %>%
+  pull(rng) %>%
+  sort()
+```
+
+    ## `summarise()` regrouping output by 'Year' (override with `.groups` argument)
+
+    ##  [1]  1470  2000  2450  3900  4100  4220  4300  6300  6400  8220  8440  8990
+    ## [13] 11900 12720 12910 13800 17000 51400
+
+So… the largest inter-group differences occur in ‘TOTAL PCB-H’, but not
+by that much.
+
+Note also that ‘PCBS’ appear to be rounded to nearest 10, while ‘TOTAL
+PCB-H’ is not.
+
+## Conclusion:
+
+We should work with ‘TOTAL PCB-H’, which is both more complete, and
+apparently more precise (in terms of decimal representation, not
+measurement accuracy).
+
+# PCB Nomenclature
+
+PCBs are sometimes reported in the EGAD data as individual PCBS and
+sometimes by PCB Number.
+
+All the PCBs listed by PCB number are mixtures of PCBs, probably
+"co-eluted’ PCBs. They are given DEP identifiers, not true CAS
+registration numbers, in the CAS\_NO field.
+
+So, PCBs are reported in the following ways: \* Individual PCBs under
+chemical names \* Mixtures of co-eluted PCBs under congener numbers
+(separated by slashes.) \* Calculated totals of various kinds.
+
+It is confusing that some PCBs are listed by PCB number and some are
+listed by chemical name. This poses problems matching chemicals with the
+lists of PCBs included in various totals and groups, which typically use
+one approach or the other (see below).
+
+## Load PCB Nomenclature Table
+
+We load a table that includes several different ways of naming PCBs,
+including by CAS Registration Number, by PCB Congener number, and by
+chemical name. The table provides a way to translate between different
+ways of naming the same PCBs.
+
+``` r
+pcb_translator <-  read_excel(file.path(parent,"Parameter List.xlsx"), 
+                             sheet = "PCB Nomenclature")
+```
+
+We can look up PCBs by CAS number or by chemical name. Unfortunately,
+neither is “spelled” the same in the DEP data and in the table of
+nomenclature.
+
+Official CAS numbers in the nomenclature table are structured as
+follows:
+
+(\#)\#\#\#\#-\#\#-\#,
+
+that is, four or five digits, a dash, two digits, a dash, and one digit.
+
+The CAS numbers column in the DEP database contain not only CAS numbers,
+but also some DEP-specific identifiers for mixtures and totals. But the
+CAS numbers it contains have no dashes. One way to translate may be to
+convert the CAS numbers in `pcb_translator` by removing dashes.
+
+Similarly, the chemical names in the DEP database are stored in
+uppercase, so we need to convert.
+
+``` r
+pcb_translator <- pcb_translator %>%
+  mutate(casrn = gsub('-','', CASRN),
+         iupac_name = toupper(`IUPAC Name`))
+```
+
+## Developing Consistent Nomenclature based on PCB Congener Numbers
+
+### Create a List of PCB Names Found in the Data
+
+We create a list that includes all chemical names and CAS numbers from
+the PCB data from DEP (omitting calculated totals). This allows us to
+test our matching code on a simplified data set, making it easier to
+figure out if things are working as expected. The table is also useful
+for checking presence of specific congeners and mixtures in the Axys
+Analytical data
+
+``` r
+pcb_names <- pcb_data %>%
+  select(PARAMETER, CAS_NO) %>%
+  filter(! grepl('TOTAL', PARAMETER)) %>%
+  filter(! PARAMETER == 'PCBS') %>%
+  unique() %>%
+  arrange(PARAMETER)
+```
+
+### Developing Methods for Matching Data to PAH Congener Number
+
+Because the list of PCBs included in reference sums (as used in the DEP
+SWAT report) is expressed in PCB Congener Number terms, we need to
+produce alternate nomenclature that is based on PCB Numbers in a
+consistent way.
+
+#### Match by Chemical Name – Not successful
+
+``` r
+pcb_names %>%
+  left_join(pcb_translator, by = c("PARAMETER" = "iupac_name")) %>%
+  select(-CASRN, -Descriptor, -Type, - casrn, -`IUPAC Name`)  %>%
+  mutate(PCB_number = paste0('PCB-', `Congener Number`) ) %>%
+  arrange(`Congener Number`)
+```
+
+    ## # A tibble: 159 x 4
+    ##    PARAMETER             CAS_NO   `Congener Number` PCB_number
+    ##    <chr>                 <chr>                <dbl> <chr>     
+    ##  1 2-CHLOROBIPHENYL      2051607                  1 PCB-1     
+    ##  2 3-CHLOROBIPHENYL      2051618                  2 PCB-2     
+    ##  3 4-CHLOROBIPHENYL      2051629                  3 PCB-3     
+    ##  4 2,2'-DICHLOROBIPHENYL 13029088                 4 PCB-4     
+    ##  5 2,3-DICHLOROBIPHENYL  16605917                 5 PCB-5     
+    ##  6 2,3'-DICHLOROBIPHENYL 25569806                 6 PCB-6     
+    ##  7 2,4-DICHLOROBIPHENYL  33284503                 7 PCB-7     
+    ##  8 2,4'-DICHLOROBIPHENYL 34883437                 8 PCB-8     
+    ##  9 2,5-DICHLOROBIPHENYL  34883391                 9 PCB-9     
+    ## 10 2,6-DICHLOROBIPHENYL  33146451                10 PCB-10    
+    ## # ... with 149 more rows
+
+One chemical name fails to match: 2’,3,4,4’,5-PENTACHLOROBIPHENYL
+65510443 NA PCB-NA
+
+##### Apparent Error in DEP Chemical Name
+
+The entry for `2',3,4,4',5-PENTACHLOROBIPHENY`L`in the DEP data appears
+to be an error. The chemical with the matching CAS number is, in
+fact,`2,3’,4,4’,5’-PENTACHLOROBIPHENYL\`, Listed as PCB-123. Searching
+online, we could not find a PCB matching the name from the DEP data.
+
+#### Test Match by CAS Number – Successful
+
+``` r
+pcb_names %>%
+  left_join(pcb_translator, by = c("CAS_NO" = "casrn")) %>%
+  select(-CASRN, -Descriptor, -Type, -`IUPAC Name`, -iupac_name)  %>%
+  mutate(PCB_number = paste0('PCB-', `Congener Number`) ) %>%
+  arrange(`Congener Number`) %>%
+  select(-`Congener Number`)
+```
+
+    ## # A tibble: 159 x 3
+    ##    PARAMETER             CAS_NO   PCB_number
+    ##    <chr>                 <chr>    <chr>     
+    ##  1 2-CHLOROBIPHENYL      2051607  PCB-1     
+    ##  2 3-CHLOROBIPHENYL      2051618  PCB-2     
+    ##  3 4-CHLOROBIPHENYL      2051629  PCB-3     
+    ##  4 2,2'-DICHLOROBIPHENYL 13029088 PCB-4     
+    ##  5 2,3-DICHLOROBIPHENYL  16605917 PCB-5     
+    ##  6 2,3'-DICHLOROBIPHENYL 25569806 PCB-6     
+    ##  7 2,4-DICHLOROBIPHENYL  33284503 PCB-7     
+    ##  8 2,4'-DICHLOROBIPHENYL 34883437 PCB-8     
+    ##  9 2,5-DICHLOROBIPHENYL  34883391 PCB-9     
+    ## 10 2,6-DICHLOROBIPHENYL  33146451 PCB-10    
+    ## # ... with 149 more rows
+
+None fail to match by CAS\_NO. Since matching by CAS number works
+consistently, we will use that.
+
+## Add Congener Number to PCB Names Data
+
+We generate a new column of PCB names, by matching CAS number, add names
+where matches occur, and retain the old names, where they already are in
+PCB number format (specifically for co-eluted mixtures).
+
+``` r
+pcb_names <- pcb_names %>%
+  left_join(pcb_translator, by = c("CAS_NO" = "casrn")) %>%
+  select(-CASRN, -Descriptor, -Type, -`IUPAC Name`, -iupac_name)  %>%
+  mutate(PCB_number = paste0('PCB-', `Congener Number`) ) %>%
+  mutate(pcb_congener_names = if_else(grepl('PCB', PARAMETER),
+                            PARAMETER,
+                            PCB_number)) %>%
+  mutate(pcb_congener_names = if_else(pcb_congener_names == 'PCB-NA',
+                                       NA_character_,
+                                       pcb_congener_names)) %>%
+  arrange(`Congener Number`) %>%
+  select(-`Congener Number`, -PCB_number)
+pcb_names
+```
+
+    ## # A tibble: 159 x 3
+    ##    PARAMETER             CAS_NO   pcb_congener_names
+    ##    <chr>                 <chr>    <chr>             
+    ##  1 2-CHLOROBIPHENYL      2051607  PCB-1             
+    ##  2 3-CHLOROBIPHENYL      2051618  PCB-2             
+    ##  3 4-CHLOROBIPHENYL      2051629  PCB-3             
+    ##  4 2,2'-DICHLOROBIPHENYL 13029088 PCB-4             
+    ##  5 2,3-DICHLOROBIPHENYL  16605917 PCB-5             
+    ##  6 2,3'-DICHLOROBIPHENYL 25569806 PCB-6             
+    ##  7 2,4-DICHLOROBIPHENYL  33284503 PCB-7             
+    ##  8 2,4'-DICHLOROBIPHENYL 34883437 PCB-8             
+    ##  9 2,5-DICHLOROBIPHENYL  34883391 PCB-9             
+    ## 10 2,6-DICHLOROBIPHENYL  33146451 PCB-10            
+    ## # ... with 149 more rows
+
+### Are All PCB Congeners Represented?
+
+We want to “unpack” the PCB nomenclature we developed (based on the Axys
+Analytic data) and see if all PCBs are represented in the data. The
+magic function here is `separate_rows()`.
+
+``` r
+pcb_names %>%
+  select(pcb_congener_names) %>%
+  mutate(available_nums  = sub('PCB-', '', pcb_congener_names)) %>%
+  separate_rows(available_nums) %>%
+  mutate(available_nums = as.numeric(available_nums)) %>%
+  arrange(available_nums)
+```
+
+    ## # A tibble: 209 x 2
+    ##    pcb_congener_names available_nums
+    ##    <chr>                       <dbl>
+    ##  1 PCB-1                           1
+    ##  2 PCB-2                           2
+    ##  3 PCB-3                           3
+    ##  4 PCB-4                           4
+    ##  5 PCB-5                           5
+    ##  6 PCB-6                           6
+    ##  7 PCB-7                           7
+    ##  8 PCB-8                           8
+    ##  9 PCB-9                           9
+    ## 10 PCB-10                         10
+    ## # ... with 199 more rows
+
+PCB numbers 1 through 209 are represented in pcb\_names ONCE AND ONLY
+ONCE. That’s good.
+
+## Add Congener Number to PCB Data
+
+We generate a new column of PCB names, by matching CAS number, add names
+where matches occur, and retain the old names, where they already are in
+PCB number format (specifically for co-eluted mixtures).
+
+``` r
+pcb_data <- pcb_data %>%
+  left_join(pcb_translator, by = c("CAS_NO" = "casrn")) %>%
+  select(-CASRN, -Descriptor, -Type, -`IUPAC Name`, -iupac_name)  %>%
+  mutate(PCB_number = paste0('PCB-', `Congener Number`) ) %>%
+  mutate(pcb_congener_names = if_else(grepl('PCB', PARAMETER),
+                            PARAMETER,
+                            PCB_number)) %>%
+  mutate(pcb_congener_names = if_else(pcb_congener_names == 'PCB-NA',
+                                       NA_character_,
+                                       pcb_congener_names)) %>%
+  arrange(`Congener Number`) %>%
+  select(-`Congener Number`, -PCB_number)
+```
+
+# Calculating Reference Sums.
+
+The DEP 2017-2018 SWAT report states:
+
+> To compare Maine results to the NS\&T and Gulfwatch PCBs, this report
+> sums 35 congeners in the Maine SWAT PCB data, including 27 of 31 PCB
+> congeners on the NS\&T/Gulfwatch list, while including an additional 6
+> congeners that are not on the NS\&T/Gulfwatch list. This difference is
+> due to some congeners co-eluting differently or being summed
+> differently at the various laboratories. These 35 summed congeners
+> will be called “SWAT PCBs” for the purposes of this report.
+
+In other words, DEP uses “SWAT PCBs” to compare to the Gulfwatch and
+NS\&T benchmarks as the best approximation possible given the different
+laboratories involved. We will follow a similar practice here.
+
+A comparison of the two lists of PCBs is provided in Table 1.3.3.1.1 of
+the DEP report. Each list is also provided as a tab in our `Parameter
+Lists.xlsx` spreadsheet. Although we will only use the SWAT list, we
+provide both,as we will carefully check availability of parameters on
+both lists in he Axys Analytical data.
+
+## Load Parameter ListS
+
+``` r
+swat_list <- read_excel(file.path(parent,"Parameter List.xlsx"), 
+                             sheet = "PCB_SWAT") %>%
+  pull(SWAT_PCBs_35)
+swat_list
+```
+
+    ##  [1] "PCB-5"           "PCB-8"           "PCB-15"          "PCB-018/030"    
+    ##  [5] "PCB-026/029"     "PCB-020/028"     "PCB-050/053"     "PCB-52"         
+    ##  [9] "PCB-66"          "PCB-77"          "PCB-090/101/113" "PCB-118"        
+    ## [13] "PCB-126"         "PCB-132"         "PCB-153/168"     "PCB-169"        
+    ## [17] "PCB-187"         "PCB-170"         "PCB-190"         "PCB-128/166"    
+    ## [21] "PCB-195"         "PCB-208"         "PCB-180/193"     "PCB-206"        
+    ## [25] "PCB-209"         "PCB-105"
+
+``` r
+gulfwatch_list <- read_excel(file.path(parent,"Parameter List.xlsx"), 
+                             sheet = "PCB_Gulfwatch") %>%
+  pull(Gulfwatch_PCBs_31)
+gulfwatch_list
+```
+
+    ##  [1] "PCB-8/5"     "PCB-018/015" "PCB-29"      "PCB-28"      "PCB-50"     
+    ##  [6] "PCB-52"      "PCB-066/095" "PCB-77"      "PCB-101/090" "PCB-118"    
+    ## [11] "PCB-126"     "PCB-153/132" "PCB-169"     "PCB-187"     "PCB-170/190"
+    ## [16] "PCB-128"     "PCB-195/208" "PCB-180"     "PCB-206"     "PCB-209"    
+    ## [21] "PCB-105"     "PCB-44"      "PCB-87"      "PCB-138"
+
+## A Caution
+
+The SWAT data “PARAMETER” codes differ from the list of parameters in
+Table 1.3.3.1.1 because, when designating co-eluted mixtures of PCBs,
+the PARAMETER codes in the EGAD data include leading zeros in front of
+two digit Congener Numbers. The table entries from the DEP report lack
+the leading zero.
+
+To address that, we hand-edited the Excel File to provide a column of
+data that DOES include those leading zeros. In the following, we use the
+edited data columns.
+
+## Compare Parameter Lists for Presence of Congeners
+
+We want to know how the lists of congeners in the two lists differ. This
+is partly a check on the information in the Table from the DEEP report,
+and partly a check on the adequacy of the comparison between the two
+lists.
+
+``` r
+swat_nums <- tibble(SWAT = swat_list) %>%
+  mutate(nums = sub('PCB-', '', SWAT)) %>%
+  separate_rows(nums) %>%
+  mutate(nums = as.numeric(nums))%>%
+  arrange(nums) %>%
+  pull(nums) %>%
+  unique()
+```
+
+``` r
+gulfwatch_nums <- tibble(Gulfwatch = gulfwatch_list) %>%
+  mutate(nums = sub('PCB-', '', Gulfwatch)) %>%
+  separate_rows(nums) %>%
+  mutate(nums = as.numeric(nums)) %>%
+  arrange(nums) %>%
+  pull(nums)%>%
+  unique()
+
+
+cat('In SWAT, not in Gulfwatch\n')
+```
+
+    ## In SWAT, not in Gulfwatch
+
+``` r
+swat_nums[! swat_nums %in% gulfwatch_nums]
+```
+
+    ## [1]  20  26  30  53 113 166 168 193
+
+``` r
+cat('\nIn Gulfwatch not in SWAT\n')
+```
+
+    ## 
+    ## In Gulfwatch not in SWAT
+
+``` r
+gulfwatch_nums[! gulfwatch_nums %in% swat_nums]
+```
+
+    ## [1]  44  87  95 138
+
+### Inconsistency
+
+Those lists **DO NOT** match the lists of “Unique to SWAT” and “Unique
+to Gulfwatch” provides in Table 1.3.3.1.1. The lists are nearly
+identical, but not quite.
+
+Our search identifies TWO PCB Congeners in the SWAT list that are not in
+the Gulfwatch list. DEP apparently missed these congeners in their
+review:  
+\* PCB-113 (part of PCB-090/101/113)  
+\* PCB 168 (part of PCB-153/168)
+
+## Test for Missing Parameters.
+
+We now scan through the data to check if the requisite parameters are
+available. Since DEP selected the parameters for their SWAT list, all
+parameters included in that list should be available. Several
+parameters, in the Gulfwatch List should NOT be available, since they
+are based on the older analytic chemistry.
+
+### SWAT List
+
+``` r
+tmp <- pcb_data %>%
+  select(Code, `ANALYSIS_LAB_SAMPLE_ID`, pcb_congener_names) %>%
+  group_by(Code, ANALYSIS_LAB_SAMPLE_ID) %>%
+  nest() %>%
+  mutate(res1 = list(swat_list[! swat_list %in% unlist(data[[1]])]))
+(res1 <- tmp$res1[[1]])
+```
+
+    ## character(0)
+
+``` r
+(missing_congeners <- as.numeric(sub('PCB-', '', res1)))
+```
+
+    ## numeric(0)
+
+So all parameters included in the SWAT list are available from the Axys
+Analytical data, as expected.
+
+### Gulfwatch List
+
+``` r
+tmp <- pcb_data %>%
+  select(Code, `ANALYSIS_LAB_SAMPLE_ID`, pcb_congener_names) %>%
+  group_by(Code, ANALYSIS_LAB_SAMPLE_ID) %>%
+  nest() %>%
+  mutate(res2 = list(gulfwatch_list[! gulfwatch_list %in% unlist(data[[1]])]))
+(res2 <- tmp$res2[[1]])
+```
+
+    ##  [1] "PCB-8/5"     "PCB-018/015" "PCB-29"      "PCB-28"      "PCB-50"     
+    ##  [6] "PCB-066/095" "PCB-101/090" "PCB-153/132" "PCB-170/190" "PCB-128"    
+    ## [11] "PCB-195/208" "PCB-180"     "PCB-44"      "PCB-87"      "PCB-138"
+
+``` r
+(missing_congeners <- sub('PCB-', '', res2))
+```
+
+    ##  [1] "8/5"     "018/015" "29"      "28"      "50"      "066/095" "101/090"
+    ##  [8] "153/132" "170/190" "128"     "195/208" "180"     "44"      "87"     
+    ## [15] "138"
+
+And many PCB groups or individual compounds listed in the original
+Gulfwatch list are not available, also as expected.
+
+## Calculate the SWAT Sum
+
+This code conducts the following steps: 1. filter to a dataset that
+includes only the parameters we want, 2. Replace non-detects with half
+the relevant reporting limit 3. group by sample and lab replicate 4.
+Calculate Sums, and provide default values for
+
+``` r
+pcb_swat <- pcb_data %>%
+  # Filter to SWAT PCBs
+  filter(pcb_congener_names %in% swat_list) %>%
+  
+  # Address NDs
+  mutate(CONCENTRATION = if_else(is.na(`LAB QUALIFIER`), CONCENTRATION,
+                        if_else(`LAB QUALIFIER` == 'U',
+                                RL/2,
+                                CONCENTRATION))) %>%
+  
+  # Calculate sums across parameters
+  group_by(Code, ANALYSIS_LAB_SAMPLE_ID) %>%
+  summarize(conc = sum(CONCENTRATION, na.rm = TRUE),
+            PARAMETER = 'swat_pcbs_35',
+            `UNITS VALUE` = 'PG/G',
+            `TEST METHOD` = 'Calculated',
+            Class = 'PCB Calculated',
+            .groups   = 'drop') 
+pcb_swat
+```
+
+    ## # A tibble: 108 x 7
+    ##    Code     ANALYSIS_LAB_SAM~   conc PARAMETER `UNITS VALUE` `TEST METHOD` Class
+    ##    <chr>    <chr>              <dbl> <chr>     <chr>         <chr>         <chr>
+    ##  1 CBANAN_~ L10702-1          12631. swat_pcb~ PG/G          Calculated    PCB ~
+    ##  2 CBANAN_~ L10702-2          13676. swat_pcb~ PG/G          Calculated    PCB ~
+    ##  3 CBANAN_~ L10702-3 (A)      34365. swat_pcb~ PG/G          Calculated    PCB ~
+    ##  4 CBANAN_~ L10702-4          14282. swat_pcb~ PG/G          Calculated    PCB ~
+    ##  5 CBEEEE_~ L10702-17         22786. swat_pcb~ PG/G          Calculated    PCB ~
+    ##  6 CBEEEE_~ L13939-1          33796. swat_pcb~ PG/G          Calculated    PCB ~
+    ##  7 CBEEEE_~ L17179-5          20720. swat_pcb~ PG/G          Calculated    PCB ~
+    ##  8 CBEEEE_~ L20804-5          22049. swat_pcb~ PG/G          Calculated    PCB ~
+    ##  9 CBEEEE_~ L24113-1          21954. swat_pcb~ PG/G          Calculated    PCB ~
+    ## 10 CBEEEE_~ L28408-9          23046. swat_pcb~ PG/G          Calculated    PCB ~
+    ## # ... with 98 more rows
+
+Now, we need to assemble full rows of data. We do that by selecting an
+arbitrary row from the matching sample, stripping out all parameter
+specific information, leaving only the sample-specific data, and then
+joining.
+
+### Assemble Full Data Rows
+
+``` r
+# Select the first matching record.  We might actually get a few too many,
+# Since we search for all records that match the sample code.
+ancillary_data <- pcb_data %>%
+  filter(Code %in% pcb_swat$Code ) %>%
+  group_by(Code, ANALYSIS_LAB_SAMPLE_ID) %>%
+  filter(row_number() == 1) %>%
+ 
+  # Now, drop any data that is sample-specific.  We simply drop those data
+  # columns.  When we `bind_rows()` later, missing columns will be filled in 
+  # with NA.
+  
+  select(-c(`TEST METHOD`:pcb_congener_names))
+
+# Finally, we use the inner join to combine data
+pcb_swat <- ancillary_data %>%
+  inner_join(pcb_swat, by = c('Code', 'ANALYSIS_LAB_SAMPLE_ID'))
+pcb_swat
+```
+
+    ## # A tibble: 108 x 16
+    ## # Groups:   Code, ANALYSIS_LAB_SAMPLE_ID [108]
+    ##    `SITE SEQ` SiteCode Site   Year SAMPLE_DATE         SAMPLE_ID Code 
+    ##         <dbl> <chr>    <chr> <dbl> <dttm>              <chr>     <chr>
+    ##  1      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  2      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  3      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  4      76091 CBJWPB   JEWE~  2007 2007-10-22 00:00:00 CBJWPB R~ CBJW~
+    ##  5      76073 CBANAN   FALM~  2007 2007-10-18 00:00:00 CBANAN R~ CBAN~
+    ##  6      76073 CBANAN   FALM~  2007 2007-10-18 00:00:00 CBANAN R~ CBAN~
+    ##  7      76073 CBANAN   FALM~  2007 2007-10-18 00:00:00 CBANAN R~ CBAN~
+    ##  8      76073 CBANAN   FALM~  2007 2007-10-18 00:00:00 CBANAN R~ CBAN~
+    ##  9      70678 CBMCMC   MILL~  2009 2009-11-10 00:00:00 CBMCMC R~ CBMC~
+    ## 10      70678 CBMCMC   MILL~  2009 2009-11-10 00:00:00 CBMCMC R~ CBMC~
+    ## # ... with 98 more rows, and 9 more variables: CURRENT_SAMPLE_POINT_NAME <chr>,
+    ## #   `ANALYSIS LAB` <chr>, `SAMPLE COLLECTION METHOD` <chr>,
+    ## #   ANALYSIS_LAB_SAMPLE_ID <chr>, conc <dbl>, PARAMETER <chr>, `UNITS
+    ## #   VALUE` <chr>, `TEST METHOD` <chr>, Class <chr>
+
+``` r
+#rm(ancillary_data)
+```
+
+### Add those totals to the PCB data dataset.
+
+``` r
+pcb_data <- pcb_data %>%
+  bind_rows(pcb_swat)
+```
+
+# Compare SWAT Sum to 2017 published Results
+
+Now, lets calculate the desired sum and compare to results reported.
+
+``` r
+pcb_data %>%
+  filter (Year == 2017) %>%
+  filter(PARAMETER =='swat_pcbs_35')%>%
+  group_by(SiteCode) %>%
+  summarize(avg = mean(conc))
+```
+
+    ## `summarise()` ungrouping output (override with `.groups` argument)
+
+    ## # A tibble: 2 x 2
+    ##   SiteCode    avg
+    ##   <chr>     <dbl>
+    ## 1 CBEEEE   24428.
+    ## 2 CBMCMC   16759.
+
+And those averages do, in fact, look very similar to the levels shown in
+the graphic from the DEP SWAT Report from 2017 and 2018.

@@ -58,14 +58,14 @@ totals \* Determining how NOn-detects were included in totals
 library(tidyverse)
 ```
 
-    ## -- Attaching packages --------------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts ------------------------------------------------------------------------------------------ tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -161,11 +161,11 @@ of parameters, but the data contains no flag for major groups of
 parameters.
 
 The closest thing to an indicator of the groupings of parameters in use
-is the `TEST METHOD` field. We generate a pretty good starting point for
-a lookup table to assign parameters to groups based on the `TEST
+is the `TEST METHOD` field. We generated a pretty good starting point
+for a lookup table to assign parameters to groups based on the `TEST
 METHOD`.
 
-We then export that list to Excel, and edit it by hand to assign
+We then exported that list to Excel, and edit it by hand to assign
 parameters to groups.
 
 ## Develop a Preliminary list of Parameters
@@ -827,9 +827,18 @@ SWAT_simplified %>%
 | SW8270CM           | TOTAL PAH40-O                                |
 | SW8270CM           | WEIGHT                                       |
 
+Some of the PAH values marked as “Calculated”, especially the groups of
+PAHs designated with a “C-” value may not always represent calculations.
+In standard practice, those values are aggregates of substituted PAHs,
+either calculated or not. Not all the subcomponent PAHs for these sums
+appear in the data, so it is not clear that these are all simple
+calculations rather than data in their own right.
+
 ## Read Excel File with Classification of Parameters
 
-We can then read in the resulting Excel File to provide groupings…
+We loaded a version of the preceding table into Excel, and hand edited
+it to provide useful groupings of parameters. here we read that list
+back into R.
 
 ``` r
 Parameter_List <- read_excel(file.path(parent,"Parameter List.xlsx"), 
@@ -858,7 +867,8 @@ Parameter_List
 
 ``` r
 SWAT_simplified <- SWAT_simplified %>% 
-  mutate(Class = Parameter_List$Class[match(PARAMETER, Parameter_List$PARAMETER)])
+  mutate(Class = Parameter_List$Class[match(PARAMETER,
+                                            Parameter_List$PARAMETER)])
 ```
 
 ## How are contaminant classes distributed among sampling events?
@@ -866,6 +876,7 @@ SWAT_simplified <- SWAT_simplified %>%
 ``` r
 SWAT_simplified %>% 
   group_by(SiteCode, SAMPLE_DATE, Class) %>%
+  mutate(class = factor(Class)) %>%
   summarize(n = sum(! is.na(CONCENTRATION)),
             .groups = 'drop') %>%
   pivot_wider(names_from = Class, values_from = n, values_fill = 0) %>%
@@ -873,48 +884,48 @@ SWAT_simplified %>%
   kable()
 ```
 
-| SiteCode | SAMPLE\_DATE | Metal | PAH | PAH Calculated |  PCB | PCB Calculated | PCB Mixture | Pesticide | Pesticides Calculated | Physical | Species | PFC | Dioxin | Dioxin Calculated |
-| :------- | :----------- | ----: | --: | -------------: | ---: | -------------: | ----------: | --------: | --------------------: | -------: | ------: | --: | -----: | ----------------: |
-| CBHRHR   | 2007-10-18   |   132 |   0 |              0 |    0 |              0 |           0 |         0 |                     0 |        4 |       4 |   0 |      0 |                 0 |
-| CBMBBH   | 2016-09-22   |     0 |   0 |              0 |    0 |              0 |           0 |         0 |                     0 |        4 |       4 |   4 |      0 |                 0 |
-| CBMCMC   | 2006-10-12   |     0 |   0 |              0 |    0 |              0 |           0 |        23 |                     0 |        6 |       3 |   0 |      0 |                 0 |
-| CBGDSW   | 2003-10-01   |     0 |   0 |              0 |    2 |              0 |           0 |         0 |                     0 |        8 |       4 |   0 |      9 |                 8 |
-| CBRYMT   | 2003-10-01   |     0 |   0 |              0 |    3 |              0 |           0 |         0 |                     0 |        8 |       4 |   0 |      9 |                 8 |
-| CBFROR   | 2003-10-01   |     0 |   0 |              0 |    4 |              0 |           0 |         0 |                     0 |        8 |       4 |   0 |     13 |                 8 |
-| CBRYMT   | 2003-11-04   |     0 |   0 |              0 |   53 |              0 |           0 |         0 |                     0 |        8 |       4 |   0 |      0 |                 0 |
-| CBFROR   | 2003-10-16   |     0 |   0 |              0 |   58 |              0 |           0 |         0 |                     0 |       16 |       8 |   0 |     17 |                 8 |
-| CBFROR   | 2003-11-17   |    44 |  30 |              0 |  123 |              0 |          78 |        10 |                     0 |       10 |       7 |   0 |      0 |                 0 |
-| CBGDSW   | 2003-11-17   |    45 |  12 |              0 |  149 |              0 |          96 |         8 |                     0 |       12 |       8 |   0 |      0 |                 0 |
-| CBGDCC   | 2006-10-17   |    58 |  67 |              0 |  314 |             21 |          99 |        47 |                     0 |       21 |       3 |   0 |      0 |                 0 |
-| CBBBBB   | 2006-11-29   |    64 |  69 |              0 |  316 |             21 |          99 |        71 |                     0 |       16 |       3 |   0 |      0 |                 0 |
-| CBMCMC   | 2006-10-30   |    58 |  45 |              0 |  320 |             21 |          99 |        16 |                     0 |       21 |       4 |   0 |      0 |                 0 |
-| CBEEEE   | 2017-10-11   |    72 | 423 |            342 |  810 |             63 |         288 |         0 |                     0 |        9 |       3 |   0 |      0 |                 0 |
-| CBMCMC   | 2014-09-17   |    66 | 405 |            342 |  978 |             63 |         297 |         0 |                     0 |       18 |       3 |   0 |      0 |                 0 |
-| CBMCMC   | 2017-10-12   |    96 | 561 |            456 | 1086 |             84 |         384 |         0 |                     0 |       20 |       4 |   0 |      0 |                 0 |
-| CBSPSP   | 2010-10-14   |    96 | 552 |            480 | 1098 |             84 |         384 |       114 |                    36 |       20 |       4 |   0 |      0 |                 0 |
-| CBANAN   | 2007-10-18   |   132 | 270 |             36 | 1155 |             72 |         384 |        96 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBEEEE   | 2007-10-31   |   132 | 345 |             45 | 1164 |             72 |         384 |       120 |                    72 |       12 |       4 |  12 |      0 |                 0 |
-| CBLNFT   | 2009-10-27   |    96 | 516 |            459 | 1182 |             84 |         390 |       231 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBFRMR   | 2007-11-05   |   132 | 264 |             36 | 1191 |             72 |         384 |       126 |                    72 |       12 |       4 |  12 |      0 |                 0 |
-| CBMBBR   | 2009-09-28   |    96 | 432 |            438 | 1203 |             84 |         387 |       195 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBQHQH   | 2009-09-24   |    96 | 456 |            429 | 1209 |             93 |         396 |        93 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBHWNP   | 2014-09-19   |    94 | 516 |            453 | 1212 |             84 |         396 |         0 |                     0 |       32 |       4 |  12 |      0 |                 0 |
-| CBJWPB   | 2007-10-22   |   132 | 261 |             36 | 1218 |             72 |         387 |       105 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBEEEE   | 2009-11-10   |    96 | 537 |            462 | 1236 |             84 |         390 |       225 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBMBMB   | 2008-10-21   |   138 | 267 |             36 | 1239 |             72 |         393 |        42 |                    63 |       12 |       4 |   0 |      0 |                 0 |
-| CBPRMT   | 2008-11-18   |   132 | 276 |             36 | 1248 |             72 |         396 |        57 |                    45 |       20 |       4 |  12 |    141 |                36 |
-| CBEEEE   | 2013-10-09   |    96 | 564 |            474 | 1248 |             84 |         393 |         0 |                     0 |       28 |       4 |  12 |      0 |                 0 |
-| CBSPSP   | 2007-10-31   |   132 | 276 |             36 | 1251 |             72 |         384 |       135 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBHRHR   | 2007-10-22   |     0 | 276 |             36 | 1254 |             72 |         396 |       114 |                    36 |        8 |       4 |   0 |      0 |                 0 |
-| CBFRIR   | 2009-09-22   |    96 | 552 |            480 | 1257 |             84 |         396 |       210 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBMCMC   | 2011-10-04   |    96 | 531 |            468 | 1272 |             84 |         396 |       129 |                    36 |       20 |       4 |   0 |      0 |                 0 |
-| CBSPSP   | 2015-09-21   |    96 | 561 |            456 | 1275 |             84 |         393 |         0 |                     0 |       20 |       4 |   0 |      0 |                 0 |
-| CBEEEE   | 2011-10-03   |    96 | 552 |            468 | 1278 |             93 |         393 |       132 |                    36 |       20 |       4 |   0 |      0 |                 0 |
-| CBMBBH   | 2007-11-05   |   132 | 276 |             36 | 1281 |             72 |         396 |        87 |                    54 |       12 |       4 |   0 |      0 |                 0 |
-| CBMCMC   | 2009-11-10   |    96 | 468 |            456 | 1287 |             84 |         396 |       213 |                    36 |       12 |       4 |   0 |      0 |                 0 |
-| CBEEEE   | 2015-09-22   |    96 | 561 |            468 | 1290 |             84 |         396 |         0 |                     0 |       20 |       4 |   0 |      0 |                 0 |
-| CBMBBH   | 2014-09-29   |    94 | 519 |            456 | 1299 |             84 |         396 |         0 |                     0 |       32 |       4 |   9 |      0 |                 0 |
-| CBSPSP   | 2012-09-25   |    96 | 558 |            480 | 1302 |             84 |         396 |       108 |                    36 |       36 |       4 |   0 |      0 |                 0 |
+| SiteCode | SAMPLE\_DATE | Metal | PAH | PAH Calculated |  PCB | PCB Calculated | PCB Mixture | Pesticide | Pesticides Calculated | Physical | Species | PFC | Other | PAH Substituted | Dioxin | Dioxin Calculated |
+| :------- | :----------- | ----: | --: | -------------: | ---: | -------------: | ----------: | --------: | --------------------: | -------: | ------: | --: | ----: | --------------: | -----: | ----------------: |
+| CBHRHR   | 2007-10-18   |   132 |   0 |              0 |    0 |              0 |           0 |         0 |                     0 |        4 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBMBBH   | 2016-09-22   |     0 |   0 |              0 |    0 |              0 |           0 |         0 |                     0 |        4 |       4 |   4 |     0 |               0 |      0 |                 0 |
+| CBMCMC   | 2006-10-12   |     0 |   0 |              0 |    0 |              0 |           0 |        23 |                     0 |        6 |       3 |   0 |     0 |               0 |      0 |                 0 |
+| CBGDSW   | 2003-10-01   |     0 |   0 |              0 |    2 |              0 |           0 |         0 |                     0 |        8 |       4 |   0 |     0 |               0 |      9 |                 8 |
+| CBRYMT   | 2003-10-01   |     0 |   0 |              0 |    3 |              0 |           0 |         0 |                     0 |        8 |       4 |   0 |     0 |               0 |      9 |                 8 |
+| CBFROR   | 2003-10-01   |     0 |   0 |              0 |    4 |              0 |           0 |         0 |                     0 |        8 |       4 |   0 |     0 |               0 |     13 |                 8 |
+| CBRYMT   | 2003-11-04   |     0 |   0 |              0 |   53 |              0 |           0 |         0 |                     0 |        8 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBFROR   | 2003-10-16   |     0 |   0 |              0 |   58 |              0 |           0 |         0 |                     0 |       16 |       8 |   0 |     0 |               0 |     17 |                 8 |
+| CBFROR   | 2003-11-17   |    44 |  30 |              0 |  123 |              0 |          78 |        10 |                     0 |       10 |       7 |   0 |     0 |               0 |      0 |                 0 |
+| CBGDSW   | 2003-11-17   |    45 |  12 |              0 |  149 |              0 |          96 |         8 |                     0 |       12 |       8 |   0 |     0 |               0 |      0 |                 0 |
+| CBGDCC   | 2006-10-17   |    58 |  67 |              0 |  314 |             21 |          99 |        47 |                     0 |       21 |       3 |   0 |     0 |               0 |      0 |                 0 |
+| CBBBBB   | 2006-11-29   |    64 |  69 |              0 |  316 |             21 |          99 |        71 |                     0 |       16 |       3 |   0 |     0 |               0 |      0 |                 0 |
+| CBMCMC   | 2006-10-30   |    58 |  45 |              0 |  320 |             21 |          99 |        16 |                     0 |       21 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBEEEE   | 2017-10-11   |    72 | 423 |            108 |  810 |             63 |         288 |         0 |                     0 |        9 |       3 |   0 |     0 |             234 |      0 |                 0 |
+| CBMCMC   | 2014-09-17   |    66 | 405 |            108 |  978 |             63 |         297 |         0 |                     0 |       18 |       3 |   0 |     0 |             234 |      0 |                 0 |
+| CBMCMC   | 2017-10-12   |    96 | 561 |            144 | 1086 |             84 |         384 |         0 |                     0 |       20 |       4 |   0 |     0 |             312 |      0 |                 0 |
+| CBSPSP   | 2010-10-14   |    96 | 552 |            144 | 1098 |             84 |         384 |       114 |                    36 |       20 |       4 |   0 |     0 |             336 |      0 |                 0 |
+| CBANAN   | 2007-10-18   |   132 | 270 |             36 | 1155 |             72 |         384 |        96 |                    36 |       12 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBEEEE   | 2007-10-31   |   132 | 345 |             45 | 1164 |             72 |         384 |       120 |                    72 |       12 |       4 |  12 |     0 |               0 |      0 |                 0 |
+| CBLNFT   | 2009-10-27   |    96 | 516 |            144 | 1182 |             84 |         390 |       231 |                    36 |       12 |       4 |   0 |     0 |             315 |      0 |                 0 |
+| CBFRMR   | 2007-11-05   |   132 | 264 |             36 | 1191 |             72 |         384 |       126 |                    72 |       12 |       4 |  12 |     0 |               0 |      0 |                 0 |
+| CBMBBR   | 2009-09-28   |    96 | 432 |            144 | 1203 |             84 |         387 |       195 |                    36 |       12 |       4 |   0 |     0 |             294 |      0 |                 0 |
+| CBQHQH   | 2009-09-24   |    96 | 456 |            144 | 1209 |             93 |         396 |        93 |                    36 |       12 |       4 |   0 |     0 |             285 |      0 |                 0 |
+| CBHWNP   | 2014-09-19   |    94 | 516 |            144 | 1212 |             84 |         396 |         0 |                     0 |       32 |       4 |  12 |     0 |             309 |      0 |                 0 |
+| CBJWPB   | 2007-10-22   |   132 | 261 |             36 | 1218 |             72 |         387 |       105 |                    36 |       12 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBEEEE   | 2009-11-10   |    96 | 537 |            144 | 1236 |             84 |         390 |       225 |                    36 |       12 |       4 |   0 |     0 |             318 |      0 |                 0 |
+| CBMBMB   | 2008-10-21   |   138 | 267 |             36 | 1239 |             72 |         393 |        42 |                    63 |       12 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBPRMT   | 2008-11-18   |   132 | 276 |             36 | 1248 |             72 |         396 |        57 |                    45 |       20 |       4 |  12 |     0 |               0 |    141 |                36 |
+| CBEEEE   | 2013-10-09   |    96 | 564 |            144 | 1248 |             84 |         393 |         0 |                     0 |       28 |       4 |  12 |     0 |             330 |      0 |                 0 |
+| CBSPSP   | 2007-10-31   |   132 | 276 |             36 | 1251 |             72 |         384 |       135 |                    36 |       12 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBHRHR   | 2007-10-22   |     0 | 276 |             36 | 1254 |             72 |         396 |       114 |                    36 |        8 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBFRIR   | 2009-09-22   |    96 | 552 |            144 | 1257 |             84 |         396 |       210 |                    36 |       12 |       4 |   0 |     0 |             336 |      0 |                 0 |
+| CBMCMC   | 2011-10-04   |    96 | 531 |            144 | 1272 |             84 |         396 |       129 |                    36 |       20 |       4 |   0 |     0 |             324 |      0 |                 0 |
+| CBSPSP   | 2015-09-21   |    96 | 561 |            144 | 1275 |             84 |         393 |         0 |                     0 |       20 |       4 |   0 |     0 |             312 |      0 |                 0 |
+| CBEEEE   | 2011-10-03   |    96 | 552 |            144 | 1278 |             93 |         393 |       132 |                    36 |       20 |       4 |   0 |     0 |             324 |      0 |                 0 |
+| CBMBBH   | 2007-11-05   |   132 | 276 |             36 | 1281 |             72 |         396 |        87 |                    54 |       12 |       4 |   0 |     0 |               0 |      0 |                 0 |
+| CBMCMC   | 2009-11-10   |    96 | 468 |            144 | 1287 |             84 |         396 |       213 |                    36 |       12 |       4 |   0 |     0 |             312 |      0 |                 0 |
+| CBEEEE   | 2015-09-22   |    96 | 561 |            144 | 1290 |             84 |         396 |         0 |                     0 |       20 |       4 |   0 |     0 |             324 |      0 |                 0 |
+| CBMBBH   | 2014-09-29   |    94 | 519 |            144 | 1299 |             84 |         396 |         0 |                     0 |       32 |       4 |   9 |     0 |             312 |      0 |                 0 |
+| CBSPSP   | 2012-09-25   |    96 | 558 |            144 | 1302 |             84 |         396 |       108 |                    36 |       36 |       4 |   0 |     0 |             336 |      0 |                 0 |
 
 What that shows is that MOST samples include data from most parameters,
 but:
