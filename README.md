@@ -20,19 +20,19 @@ review, critique, learn from, and build upon CBEP science.
  "Graphics" folder.  The other two folders are only included if strictly
  necessary.
 
-- Original Data.  Original data, with a "DATA_SOURCES.md" or "READ ME.txt" file
+- **Original Data**.  Original data, with a "DATA_SOURCES.md" or "READ ME.txt" file
 that documents data sources.  
     **DATA IN THIS FOLDER IS AS ORIGINALLY PROVIDED OR ACCESSED.** 
 
-- Derived Data.  Data derived from the original raw data.  Includes
+- **Derived Data**.  Data derived from the original raw data.  Includes
 documentation of data reorganization steps, either in the form of files (R
 notebooks, Excel files, etc.) that embody data transformations, or via another
 README.txt file.
 
-- Analysis.  Contains one or more R Notebooks proceeding through the data
+- **Analysis**.  Contains one or more R Notebooks proceeding through the data
 analysis steps.
 
-- Graphics.  Contains R Notebooks stepping through development of related
+- **Graphics**.  Contains R Notebooks stepping through development of related
 graphics, and also raw copies of resulting graphics, usually in \*.png and
 \*.pdf formats.  These graphics may differ from graphics as they appear in final
 State of the Bay graphical layouts.

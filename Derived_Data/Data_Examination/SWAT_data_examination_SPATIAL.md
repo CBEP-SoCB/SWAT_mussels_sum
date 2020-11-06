@@ -13,11 +13,12 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
       - [List of Sites](#list-of-sites)
       - [Match Sites with Geographic
         Locations](#match-sites-with-geographic-locations)
-      - [Write CSV file for GIS](#write-csv-file-for-gis)
   - [Sample Points](#sample-points)
       - [Examine Distances between Site and Sample
         Points](#examine-distances-between-site-and-sample-points)
       - [Map Visualization](#map-visualization)
+      - [Missing Sample Point Data](#missing-sample-point-data)
+      - [Write CSV file for GIS](#write-csv-file-for-gis)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -52,14 +53,14 @@ sample\_spatial.csv sites\_spatial.csv
 library(tidyverse)
 ```
 
-    ## -- Attaching packages --------------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages ------------------------------------ tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts ------------------------------------------------------------------------------------------ tidyverse_conflicts() --
+    ## -- Conflicts --------------------------------------- tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -79,7 +80,7 @@ theme_set
     ##     ggplot_global$theme_current <- new
     ##     invisible(old)
     ## }
-    ## <bytecode: 0x0000000016571ed0>
+    ## <bytecode: 0x000000001659be78>
     ## <environment: namespace:ggplot2>
 
 ``` r
@@ -198,9 +199,20 @@ any(duplicated(sites$Site))
 In addition to the toxics data, we received a separate Excel file
 containing geospatial data. That data includes repeat geographic data
 for each site, apparently providing more information on separate sample
-collection events. As far as we have been able to tell, however, there
-is no consistent sample identifier between the geographic data and
-toxics data as received.
+collection events.
+
+As far as we have been able to tell, however, there is no single
+consistent sample identifier between the geographic data and toxics data
+as received.
+
+It appears we can match sites from the geospatial data based on`SITE
+SEQ` or by pulling apart the “EGAD\_SITE\_NAME” and
+“CURRENT\_SITE\_NAME” into a name and a code, and matching by code.
+
+Sample locations are more complicated, sincee in many cases, the same
+string is used to designate replicates at different SITEs. That is,
+sample points are not unique, athough the combination of sample point,
+site and year does appear to be unique.
 
 Here we reduce the spatial data to data on each nominal sampling
 location, and check that we have geographic data for each site. As is
@@ -280,35 +292,17 @@ sum(! is.na(sites_spatial_data$SITE))
 
     ## [1] 20
 
-So, they’re all there. Presumably the other sites have samples of other
-shellfish (in the second tab of the source Excel File).
-
-## Write CSV file for GIS
-
-``` r
-write_csv(sites_spatial_data, 'sites_spatial.csv')
-```
-
-ArcGIS was having trouble reading earlier drafts of the following file,
-so we simplify here by removing spaces from column names and removing
-NAs. Without this step, NAs were forcing ArcGIS to interpret data
-columns as text.
-
-``` r
-samples_spatial_data %>%
-  select ( -`SITE UTM X`, -`SITE UTM Y`, -`SITE LATITUDE`, -`SITE LONGITUDE`,
-           - DATA_SOURCE, -LOCATION_ACCURACY, -LOCATION_METHOD) %>%
-  rename_all(~gsub(' ', '', .)) %>%
-  write_csv('samples_spatial.csv', na = '')
-```
+So, all DEP mussel tissue SITEs are included. Presumably the other sites
+have samples of other shellfish (clams, in particular were provided in
+the second tab of the source Excel File).
 
 # Sample Points
 
-Many Sites have more than one SAMPLE POINTs. The SAMPLE POINTs appear to
+Many Sites have more than one SAMPLE POINT. The SAMPLE POINTs appear to
 be the real sampling locations, each associated with a nominal SITE.
 Unfortunately, recording of actual sampling locations may have been
-inconsistent with real (i.e., not identical) SAMPLE POINT data not
-available from earlier sample years.
+inconsistent with real SAMPLE POINT data not always available,
+especially from some earlier sample years.
 
 ## Examine Distances between Site and Sample Points
 
@@ -364,19 +358,25 @@ kable(a, col.names = c('Site', 'Max X Distance', 'Max Y Distance', 'Maximum Dist
 | NCCA10-1020 |           0.00 |           0.00 |                       0.00 |  1 |
 | NCCA10-1021 |           0.00 |           0.00 |                       0.00 |  1 |
 
-## Map Visualization
+``` r
+rm(a)
+```
 
 Several Sites show (unreasonable?) large differences between Sample
 Points and nominal Site locations. To make sense of this, we mapped
-Sites and Sample Points in Arc GIS. \! [Map of SWAT Sampling Locations
-and Nominal Sites](SWAT_Toxics_Locations.jpg) The map shows clearly that
-sites represent general areas, not the exact locations where samples
-were collected. IN most cases, the distances are trivial on a map of
-this scale, but not always.
+Sites and Sample Points in Arc GIS.
+
+## Map Visualization
+
+![Map of SWAT Sampling Locations and Nominal
+Sites](SWAT_Toxics_Locations.jpg) The map shows clearly that sites
+represent general areas, not the exact locations where samples were
+collected. In most cases, the distances are trivial on a map of this
+scale, but not always.
 
   - **CBBBBB – Back Bay**: Do not appear to be typos, but exact
     locations do not appear to have been collected in all years. Samples
-    appearto have ben collected from various locations along the Back
+    appea rto have been collected from various locations along the Back
     Bay Shoreline. identical for all samples. Locations in Samples in
     2015 all fairly consistent, but differ slightly.
   - **CBHWNP – Harpswell Navy Pier**: Multiple samples from each of two
@@ -392,3 +392,108 @@ this scale, but not always.
     West shore.  
   - **CBPRM – Presumpscot River Mouth** – Sample Points along shore,
     BOTH shores.
+
+## Missing Sample Point Data
+
+Some Sites do not appear to have independent location data for sample
+points, or not for all sample points. That is actually easier to see in
+the Excel file, but we can look at it in R by searching for NAs.
+
+``` r
+samples_spatial_data %>%
+  filter(is.na(`SAMPLE POINT UTM X`)) %>%
+  select(-starts_with('SITE'), - starts_with('LOCATION'))
+```
+
+    ## # A tibble: 21 x 9
+    ##    CURRENT_SITE_NA~ DATA_SOURCE `SAMPLE POINT S~ `SAMPLE POINT N~
+    ##    <chr>            <chr>                  <dbl> <chr>           
+    ##  1 MILL CREEK - CB~ MDEP BLWQ ~            82245 REP 4           
+    ##  2 MILL CREEK - CB~ MDEP BLWQ ~           132065 REP 1 2017      
+    ##  3 MILL CREEK - CB~ MDEP BLWQ ~           132066 REP 2 2017      
+    ##  4 MILL CREEK - CB~ MDEP BLWQ ~           132067 REP 3 2017      
+    ##  5 MILL CREEK - CB~ MDEP BLWQ ~           132068 REP 4 2017      
+    ##  6 BRUNSWICK MARE ~ MDEP BLWQ ~           132078 REP 1 2017      
+    ##  7 BRUNSWICK MARE ~ MDEP BLWQ ~           132079 REP 2 2017      
+    ##  8 BRUNSWICK MARE ~ MDEP BLWQ ~           132080 REP 3 2017      
+    ##  9 BRUNSWICK MARE ~ MDEP BLWQ ~           132081 REP 4 2017      
+    ## 10 EAST END BEACH ~ MDEP BLWQ ~           132062 REP 1 2017      
+    ## # ... with 11 more rows, and 5 more variables: `SAMPLE POINT TYPE` <chr>,
+    ## #   `SAMPLE POINT UTM X` <dbl>, `SAMPLE POINT UTM Y` <dbl>, `SAMPLE POINT
+    ## #   LATITUDE` <dbl>, `SAMPLE POINT LONGITUDE` <dbl>
+
+This affects the followingfive sites atleast once:
+
+``` r
+samples_spatial_data %>%
+  filter(is.na(`SAMPLE POINT UTM X`)) %>%
+  select(CURRENT_SITE_NAME) %>%
+  unique()
+```
+
+    ## # A tibble: 5 x 1
+    ##   CURRENT_SITE_NAME                     
+    ##   <chr>                                 
+    ## 1 MILL CREEK - CBMCMC                   
+    ## 2 BRUNSWICK MARE BROOK DRAINAGE - CBMBBH
+    ## 3 EAST END BEACH - CBEEEE               
+    ## 4 PRESUMPSCOT RIVER (MOUTH)  - CBPRMT   
+    ## 5 MIDDLE BAY (OUTER) - CBMBMB
+
+In several cases, this represents missing data from just one year, for
+sites that were sampled repeatedly. Unfortunately, a quick review of the
+data shows that similar sample point names (for replicates) were used
+for different physical locations, with UTM coordinates suggesting
+samples with similar names in different years were often collected well
+over 100 meters apart. We can not readily “rescue” missing data based on
+data from prior years.
+
+Accordingly, it appears that the best we can do is assign data to Sites,
+even though samples for some sites are spread over hundreds of meters of
+shoreline.
+
+## Write CSV file for GIS
+
+First, we discard site data for locations for which we have no mussel
+samples. Since we used names sites to generate the SITE code, we can
+check if that is NA. If it is, we have no related mussel samples.
+
+``` r
+sites_spatial_data <- sites_spatial_data %>%
+  filter(! is.na(SITECODE))
+
+#write_csv(sites_spatial_data, 'sites_spatial.csv')
+```
+
+ArcGIS was having trouble reading earlier drafts of the following file,
+so we simplify here by removing spaces from column names and removing
+NAs. Without this step, NAs were forcing ArcGIS to interpret data
+columns as text.
+
+``` r
+samples_spatial_data %>%
+  select ( -`SITE UTM X`, -`SITE UTM Y`, -`SITE LATITUDE`, -`SITE LONGITUDE`,
+           - DATA_SOURCE, -LOCATION_ACCURACY, -LOCATION_METHOD) %>%
+  rename_all(~gsub(' ', '', .))
+```
+
+    ## # A tibble: 183 x 9
+    ##    SITESEQ CURRENT_SITE_NA~ SAMPLEPOINTSEQ SAMPLEPOINTNAME SAMPLEPOINTTYPE
+    ##      <dbl> <chr>                     <dbl> <chr>           <chr>          
+    ##  1   70615 HARRASEEKET RIV~          70661 A               MARINE         
+    ##  2   70672 BACK BAY - CBBB~          70699 REP 1           MARINE         
+    ##  3   70672 BACK BAY - CBBB~          70700 REP 2           MARINE         
+    ##  4   70672 BACK BAY - CBBB~          70701 REP 3           MARINE         
+    ##  5   70672 BACK BAY - CBBB~         127990 REP 1 2015      MARINE         
+    ##  6   70672 BACK BAY - CBBB~         127991 REP 2 2015      MARINE         
+    ##  7   70672 BACK BAY - CBBB~         127992 REP 3 2015      MARINE         
+    ##  8   70672 BACK BAY - CBBB~         127993 REP 4 2015      MARINE         
+    ##  9   70672 BACK BAY - CBBB~         127994 REP 5 2015      MARINE         
+    ## 10   70674 FORE RIVER OUTE~          70719 1N              MARINE         
+    ## # ... with 173 more rows, and 4 more variables: SAMPLEPOINTUTMX <dbl>,
+    ## #   SAMPLEPOINTUTMY <dbl>, SAMPLEPOINTLATITUDE <dbl>,
+    ## #   SAMPLEPOINTLONGITUDE <dbl>
+
+``` r
+#write_csv('samples_spatial.csv', na = '')
+```

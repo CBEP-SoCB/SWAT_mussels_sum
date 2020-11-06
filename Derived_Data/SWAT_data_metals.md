@@ -1,0 +1,180 @@
+Analyse METALS data
+================
+Curtis C. Bohlen, Casco Bay Estuary Partnership
+10/30/2020
+
+  - [Introduction](#introduction)
+  - [Load Libraries](#load-libraries)
+  - [Load Data](#load-data)
+      - [Copy Data](#copy-data)
+      - [Focus on Dry Weght Basis Values
+        Only](#focus-on-dry-weght-basis-values-only)
+      - [Select metals](#select-metals)
+      - [Drop Values in Nanograms per
+        Gram](#drop-values-in-nanograms-per-gram)
+      - [Address Non Detects](#address-non-detects)
+  - [Save Results](#save-results)
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+# Introduction
+
+Maine’s Department of Environmental Protection (DEP) maintains a large
+database of environmental data called “EGAD”. Citizens can request data
+from the database through DEP staff.
+
+CBEP requested data from DEP on levels of toxic contaminants in
+shellfish tissue samples from Casco Bay. The result is a large (\>
+100,000 line) excel spreadsheet containing data from about 40 sampling
+dates from 20 locations, over a period of more than 15 years.
+
+In this Notebook, we assemble a reduced data set containing certain data
+on metals.
+
+# Load Libraries
+
+``` r
+library(tidyverse)
+```
+
+    ## -- Attaching packages ------------------------------------------------------------------------------------- tidyverse 1.3.0 --
+
+    ## v ggplot2 3.3.2     v purrr   0.3.4
+    ## v tibble  3.0.3     v dplyr   1.0.2
+    ## v tidyr   1.1.2     v stringr 1.4.0
+    ## v readr   1.3.1     v forcats 0.5.0
+
+    ## -- Conflicts ---------------------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## x dplyr::filter() masks stats::filter()
+    ## x dplyr::lag()    masks stats::lag()
+
+``` r
+library(readxl)
+#library(htmltools)  # used by knitr called here only to avoid startup text later in document
+library(knitr)
+
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set
+```
+
+    ## function (new) 
+    ## {
+    ##     old <- ggplot_global$theme_current
+    ##     ggplot_global$theme_current <- new
+    ##     invisible(old)
+    ## }
+    ## <bytecode: 0x0000000016eba258>
+    ## <environment: namespace:ggplot2>
+
+``` r
+library(LCensMeans)
+```
+
+# Load Data
+
+We load extensively reviewed and cleaned data from the Derived\_Data
+folder. \#\# Establish Folder Reference
+
+``` r
+sibfldnm <- 'Derived_Data'
+parent   <- dirname(getwd())
+sibling  <- file.path(parent,sibfldnm)
+fn <- 'SWAT_data_working.csv'
+```
+
+## Copy Data
+
+``` r
+swat_data <- read_csv(file.path(sibling, fn),
+                      col_types = cols(
+                        .default = col_character(),
+                        site_seq = col_double(),
+                        year = col_double(),
+                        sample_date = col_datetime(format = ""),
+                        concentration = col_double(),
+                        qualifier = col_character(),
+                        rl = col_double(),
+                        mdl = col_double(),
+                        dilution_factor = col_double(),
+                        conc_ugg = col_double(),
+                        conc_ngg = col_double(),
+                        rl_ugg = col_double(),
+                        rl_ngg = col_double()
+                      )) %>%
+  mutate(sample_date = as.Date(sample_date))
+```
+
+## Focus on Dry Weght Basis Values Only
+
+Data in the database also includes wet weight and lipid weight basis
+values.
+
+``` r
+swat_data <- swat_data %>%
+  filter(weight_basis == 'DRY') %>%
+  select(-weight_basis)
+```
+
+## Select metals
+
+### List of Metals
+
+``` r
+metals_list <- read_excel(file.path(sibling,"Parameter List.xlsx"), 
+                             sheet = "Parameter List") %>%
+  mutate(Class = factor(Class)) %>%
+  arrange(Class, PARAMETER) %>%
+  filter(Class == "Metal") %>%
+  pull(PARAMETER) %>%
+  as.character()
+metals_list
+```
+
+    ##  [1] "ALUMINUM" "ARSENIC"  "CADMIUM"  "CHROMIUM" "COPPER"   "IRON"    
+    ##  [7] "LEAD"     "MERCURY"  "NICKEL"   "SELENIUM" "SILVER"   "ZINC"
+
+### Filter to Metals Only
+
+``` r
+metals_data <- swat_data %>%
+  filter(parameter %in% metals_list)
+```
+
+## Drop Values in Nanograms per Gram
+
+``` r
+metals_data <- metals_data %>%
+select(-conc_ngg, -rl_ngg)
+```
+
+## Address Non Detects
+
+Metals are generally observed at relatively high concentrations compared
+to organic contaminants, which makes it convenient to measure them in
+micrograms per gram, rather than nanograms per gram.
+
+In calculating totals, DEP staff replaced non-detects with zero, half
+the reporting limits, or the reporting limits. Her we calculate
+non-detects both as half the reporting limit and using our
+log-likelihood method.
+
+``` r
+metals_data <- metals_data %>%
+  mutate(flag      = if_else(is.na(lab_qualifier),
+                             FALSE,
+                             if_else(lab_qualifier == 'U',
+                                     TRUE,
+                                     FALSE)),
+         conc_RL   = if_else(flag, rl_ugg, conc_ugg),
+         conc_HALF = if_else(flag, rl_ugg/2, conc_ugg),
+         conc_ML   = sub_cmeans(conc_RL, flag))
+```
+
+# Save Results
+
+``` r
+write_csv(metals_data, 'SWAT_metals_working.csv')
+```

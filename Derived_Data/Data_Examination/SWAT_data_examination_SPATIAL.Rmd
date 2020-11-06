@@ -117,9 +117,19 @@ any(duplicated(sites$Site))
 ## Match Sites with Geographic Locations
 In addition to the toxics data, we received a separate Excel file containing
 geospatial data.  That data includes repeat geographic data for each site,
-apparently providing more information on separate sample collection events.  As
-far as we have been able to tell, however, there is no consistent sample
-identifier between the geographic data and toxics data as received.
+apparently providing more information on separate sample collection events.
+
+As far as we have been able to tell, however, there is no single consistent
+sample identifier between the geographic data and toxics data as received.
+
+It appears we can match sites from the geospatial data based
+on`SITE SEQ` or by pulling apart the "EGAD_SITE_NAME" and "CURRENT_SITE_NAME"
+into a name and a code, and matching by code.
+
+Sample locations are more complicated, sincee in many cases, the same string
+is used to designate replicates at different SITEs.  That is, sample points
+are not unique, athough the combination of sample point,  site and year does 
+appear to be unique.
 
 Here we reduce the spatial data to data on each nominal sampling location, and
 check that we have geographic data for each site.  As is often the case, we lack
@@ -160,31 +170,16 @@ kable(sites_spatial_data)
 ```{r}
 sum(! is.na(sites_spatial_data$SITE))
 ```
-So, they're all there. Presumably the other sites have samples of other
-shellfish (in the second tab of the source Excel File).
+So, all DEP mussel tissue SITEs are included. Presumably the other sites have
+samples of other shellfish (clams, in particular were provided in the second tab
+of the source Excel File).
 
-## Write CSV file for GIS
-```{r}
-write_csv(sites_spatial_data, 'sites_spatial.csv')
-```
-
-ArcGIS was having trouble reading earlier drafts of the following file, so we
-simplify here by removing spaces from column names and removing NAs.
-Without this step, NAs were forcing ArcGIS to interpret data columns as
-text.
-```{r} 
-samples_spatial_data %>%
-  select ( -`SITE UTM X`, -`SITE UTM Y`, -`SITE LATITUDE`, -`SITE LONGITUDE`,
-           - DATA_SOURCE, -LOCATION_ACCURACY, -LOCATION_METHOD) %>%
-  rename_all(~gsub(' ', '', .)) %>%
-  write_csv('samples_spatial.csv', na = '')
-```
 
 # Sample Points
-Many Sites have more than one SAMPLE POINTs.  The SAMPLE POINTs appear
+Many Sites have more than one SAMPLE POINT.  The SAMPLE POINTs appear
 to be the real sampling locations, each associated with a nominal SITE.
 Unfortunately, recording of actual sampling locations may have been inconsistent
-with real (i.e., not identical) SAMPLE POINT data not available from earlier
+with real SAMPLE POINT data not always available, especially from some earlier
 sample years.
 
 ## Examine Distances between Site and Sample Points
@@ -206,20 +201,23 @@ a <- samples_spatial_data %>%
             .groups = 'drop') %>%
   select(-sitex, -sitey)
 kable(a, col.names = c('Site', 'Max X Distance', 'Max Y Distance', 'Maximum Distance From Site', 'N'))
+rm(a)
 ```
-## Map Visualization
+
 Several  Sites show (unreasonable?) large differences between Sample Points
 and nominal Site locations.  To make sense of this, we mapped Sites and 
 Sample Points in Arc GIS.
-! [Map of SWAT Sampling Locations and Nominal Sites](SWAT_Toxics_Locations.jpg)
+
+## Map Visualization
+![Map of SWAT Sampling Locations and Nominal Sites](SWAT_Toxics_Locations.jpg)
 The map shows clearly that sites represent general areas, not the exact
-locations where samples were collected. IN most cases, the distances are trivial
+locations where samples were collected. In most cases, the distances are trivial
 on a map of this scale, but not always.
 
 *  **CBBBBB -- Back Bay**:  Do not appear to be typos, but exact locations do
-  not appear to have been collected in all years.  Samples appearto have ben
-   collected from various locations along the Back Bay Shoreline. identical for all
-   samples.  Locations in Samples in 2015 all fairly consistent, but differ
+   not appear to have been collected in all years.  Samples appea rto have been
+   collected from various locations along the Back Bay Shoreline. identical for
+   all samples.  Locations in Samples in 2015 all fairly consistent, but differ
    slightly.
 *  **CBHWNP -- Harpswell Navy Pier**:  Multiple samples from each of two years,
    were given identical GPS coordinates.  The two locations are some distance
@@ -230,5 +228,56 @@ on a map of this scale, but not always.
    them, but is located bayward of them.
 *  **CBPRES -- Presumpscot River East** -- Sample Points along shore, East shore.  
 *  **CBPRWS -- Presumpscot River West** -- Sample Points along shore, West shore.  
-*  **CBPRM -- Presumpscot River Mouth** -- Sample Points along shore, BOTH shores.  
+*  **CBPRM  -- Presumpscot River Mouth** -- Sample Points along shore, BOTH shores.  
+
+## Missing Sample Point Data
+Some Sites do not appear to have independent location data for sample points, or
+not for all sample points.  That is actually easier to see in the Excel file,
+but we can look at it in R by searching for NAs.
+```{r}
+samples_spatial_data %>%
+  filter(is.na(`SAMPLE POINT UTM X`)) %>%
+  select(-starts_with('SITE'), - starts_with('LOCATION'))
+```
+
+This affects the followingfive sites atleast once:
+```{r}
+samples_spatial_data %>%
+  filter(is.na(`SAMPLE POINT UTM X`)) %>%
+  select(CURRENT_SITE_NAME) %>%
+  unique()
+```
+
+In several cases, this represents missing data from just one year, for
+sites that were sampled repeatedly. Unfortunately, a quick review of the
+data shows that similar sample point names (for replicates) were used for
+different physical locations, with UTM coordinates suggesting samples with 
+similar names in different years were often collected well over 100 meters
+apart.  We can not readily "rescue" missing data based on data from prior years.
+
+Accordingly, it appears that the best we can do is assign data to Sites, even
+though samples for some sites are spread over hundreds of meters of shoreline.
+
+## Write CSV file for GIS
+First, we discard site data for locations for which we have no mussel samples.
+Since we used names sites to generate the SITE code, we can check if that
+is NA.  If it is, we have no related mussel samples.
+```{r}
+sites_spatial_data <- sites_spatial_data %>%
+  filter(! is.na(SITECODE))
+
+#write_csv(sites_spatial_data, 'sites_spatial.csv')
+```
+
+ArcGIS was having trouble reading earlier drafts of the following file, so we
+simplify here by removing spaces from column names and removing NAs.
+Without this step, NAs were forcing ArcGIS to interpret data columns as
+text.
+```{r} 
+samples_spatial_data %>%
+  select ( -`SITE UTM X`, -`SITE UTM Y`, -`SITE LATITUDE`, -`SITE LONGITUDE`,
+           - DATA_SOURCE, -LOCATION_ACCURACY, -LOCATION_METHOD) %>%
+  rename_all(~gsub(' ', '', .))
+#write_csv('samples_spatial.csv', na = '')
+```
 
