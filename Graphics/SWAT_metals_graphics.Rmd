@@ -198,8 +198,8 @@ We add shorter names for graphics
 ```{r add_short_ref_names}
 references <- references %>%
   mutate(short_ref = case_when(
-      Reference_ugg == 'NS&T 85th Percentile'       ~ 'National Comparison',
-      Reference_ugg == 'Gulfwatch 85th Percentile'  ~ 'Gulf of Maine Comparison'
+      Reference_ugg == 'NS&T 85th Percentile'       ~ 'National',
+      Reference_ugg == 'Gulfwatch 85th Percentile'  ~ 'Gulf of Maine'
   ))
 ```
 
