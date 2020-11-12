@@ -14,10 +14,10 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
       - [Load Reference Values](#load-reference-values)
       - [Load Location Information](#load-location-information)
   - [Data Since 2010](#data-since-2010)
-      - [Preliminary Graphic](#preliminary-graphic)
+      - [Recents Graphic](#recents-graphic)
       - [Means and Standard Errors](#means-and-standard-errors)
   - [Trend Analyses](#trend-analyses)
-      - [Preliminary Graphic](#preliminary-graphic-1)
+      - [Trend Graphic](#trend-graphic)
       - [Results Table](#results-table)
       - [Summary Table](#summary-table)
 
@@ -100,14 +100,14 @@ results of these analyses.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages -------------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages ----------------------------------------------------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts ----------------------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts -------------------------------------------------------------------------------------- tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -207,13 +207,11 @@ published by Leblanc et al. 2009.
 We copied benchmark tables from (an on-line version of) Leblanc et
 al. 2009 into our excel spreadsheet.
 
-In addition, DEP reports on a number of health thresholds, based on
-“FTALs” – MCDC Fish Tissue Action Levels. They are not tabulated in
-the report.
+That document refers to “MCDC Fish Tissue Action Levels.” and FDA Action
+Levels. After some digging, we found a document on the Maine CDC website
+that corresponds to (most or all of) the FTALs reported by DEP.
 
-After some digging on-line, we found a document that corresponds to the
-FTALs reported by DEP. we copied those values by hand onto the Excel
-spreadsheet, and reorganized the spreadsheet.
+**ALL HEALTH\_RELATED THRESHOLDS ARE EXPRESSWD ON A WET WEIGHT BASIS**
 
 > Maine Center for Disease Control. 2001. Bureau of Health Fish Tissue
 > Action Levels.
@@ -227,17 +225,19 @@ references <- read_excel(file.path(sibling,"Parameter List.xlsx"),
   mutate(Reference_ugg = sub(' 2008', '', Reference_ugg))
 ```
 
-We will use only three of the reference values:  
+We will use only two of the reference values:  
 \* “NS\&T 85th Percentile”  
-\* “Gulfwatch 85th Percentile”  
-\* “Non-Cancer FTAL ug/g”
+\* “Gulfwatch 85th Percentile”
+
+The Health -based metrics are valuable for comparison, but they are
+expressed on a wet weight basis, and so can not be shown on one graph
+with the other reference levels.
 
 We add shorter names for graphics
 
 ``` r
 references <- references %>%
   mutate(short_ref = case_when(
-      Reference_ugg == 'Non-Cancer FTAL ug/g'       ~ 'Consumption Advisory',
       Reference_ugg == 'NS&T 85th Percentile'       ~ 'National Comparison',
       Reference_ugg == 'Gulfwatch 85th Percentile'  ~ 'Gulf of Maine Comparison'
   ))
@@ -251,16 +251,7 @@ some reference thresholds.
 
 ``` r
 ref_long <- references %>%
-  filter(grepl('85', Reference_ugg) |
-           Reference_ugg == "Non-Cancer FTAL ug/g") %>%
-  # select(-short_ref) %>%
-  # mutate(short_ref = factor(Reference_ugg,
-  #                           levels = c("Non-Cancer FTAL ug/g",
-  #                                      'NS&T 85th Percentile',
-  #                                      'Gulfwatch 85th Percentile'),
-  #                           labels = c("Consumption Advisory",
-  #                                      'National Comparison',
-  #                                      'Gulf of Maine Comparison'))) %>%
+  filter(grepl('85', Reference_ugg)) %>%
   pivot_longer(cols = Silver:Zinc, names_to = 'parameter', values_to = 'value')
 ```
 
@@ -293,29 +284,15 @@ locations <- read_csv(file.path(sibling,"sites_spatial.csv"),
                       "Inner Fore",
                       "Quahog Bay",
                       "Long Island"))
-```
-
-### Add Short Location Names
-
-Adding short location names and creating a lookup table to facilitate
-later graphics. These are probably not both necessary.
-
-``` r
+  
 swat_metals <- swat_metals %>%
   mutate(short_locs = locations$short_locs[match(sitecode,
                                                  locations$SITECODE)]) %>%
   mutate(short_locs = factor(short_locs,
                              levels = c('Navy Pier', 'Mare Brook', 'Mill Creek',
                                         'East End', 'Spring Point')))
-```
-
-``` r
 rm(locations)
 ```
-
-We have few sites with good temporal coverage. Most sites were only
-sampled once. The high frequency sites (three or more sample years)
-include: \* CBEEEE – \* CBMCMC \* CBSPSP
 
 # Data Since 2010
 
@@ -327,7 +304,7 @@ recent_data <- swat_metals %>%
   filter(year >= 2010)
 ```
 
-## Preliminary Graphic
+## Recents Graphic
 
 ``` r
 plt <- ggplot(recent_data,
@@ -355,15 +332,15 @@ plt +
  scale_color_manual(values = cbep_colors2())
 ```
 
-    ## Warning: Removed 10 rows containing missing values (geom_hline).
+    ## Warning: Removed 4 rows containing missing values (geom_hline).
 
-![](SWAT_metals_graphics_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](SWAT_metals_graphics_files/figure-gfm/recent_add_refs-1.png)<!-- -->
 
 ``` r
  ggsave('figures/metals_parameters.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
 
-    ## Warning: Removed 10 rows containing missing values (geom_hline).
+    ## Warning: Removed 4 rows containing missing values (geom_hline).
 
 ## Means and Standard Errors
 
@@ -393,9 +370,9 @@ plt +
  scale_color_manual(values = cbep_colors2())
 ```
 
-    ## Warning: Removed 10 rows containing missing values (geom_hline).
+    ## Warning: Removed 4 rows containing missing values (geom_hline).
 
-![](SWAT_metals_graphics_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](SWAT_metals_graphics_files/figure-gfm/recent_means_add_refs-1.png)<!-- -->
 
 ``` r
  #ggsave('figures/metals_parameters_means.pdf', device = cairo_pdf, width = 7, height = 5)
@@ -403,13 +380,17 @@ plt +
 
 # Trend Analyses
 
+We have few sites with good temporal coverage. Most sites were only
+sampled once. The high frequency sites (three or more sample years)
+include: \* CBEEEE – \* CBMCMC \* CBSPSP
+
 ``` r
 sites <- c('CBEEEE', 'CBMCMC', 'CBSPSP')
 trend_data <- swat_metals %>%
   filter(sitecode %in% sites)
 ```
 
-## Preliminary Graphic
+## Trend Graphic
 
 ``` r
 plt <- trend_data %>%
@@ -436,7 +417,7 @@ plt
 
     ## `geom_smooth()` using formula 'y ~ x'
 
-![](SWAT_metals_graphics_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](SWAT_metals_graphics_files/figure-gfm/trend_graphic-1.png)<!-- -->
 
 ## Results Table
 
@@ -466,9 +447,7 @@ trends_table <- tribble(
 'Pb', 'Lead',     'No Trend',  'No Trend',   'No Trend',
 'Se', 'Selenium', 'No Trend',  'No Trend',   'No Trend',
 'Zn',   'Zinc',     'No Trend',  'No Trend',   'No Trend')
-```
 
-``` r
 knitr::kable(trends_table)
 ```
 

@@ -25,6 +25,7 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
       - [Recent Conditions Dotplot](#recent-conditions-dotplot)
       - [Trend Graphic (Unused)](#trend-graphic-unused)
   - [Combined Graphic](#combined-graphic)
+      - [Create Combo Data](#create-combo-data)
       - [Recent Conditions Dotplot](#recent-conditions-dotplot-1)
       - [Add Annotations](#add-annotations)
 
@@ -65,14 +66,14 @@ folder.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ----------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages ----------------------------------------------------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts -------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts -------------------------------------------------------------------------------------- tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -330,7 +331,7 @@ plt
 
     ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
 
-![](SWAT_totals_graphics_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](SWAT_totals_graphics_files/figure-gfm/pah_graphic-1.png)<!-- -->
 \#\#\# Add Annotations
 
 ``` r
@@ -340,7 +341,7 @@ add_refs(plt, parm = 'PAH40', whch = c(2,4), sz = 3)
     ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
     ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
 
-![](SWAT_totals_graphics_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](SWAT_totals_graphics_files/figure-gfm/pah_add_annotations-1.png)<!-- -->
 
 ``` r
 ggsave('figures/pah_40_recent.pdf', device = cairo_pdf, width = 5, height = 4)
@@ -370,6 +371,12 @@ plt <- pah_trend_data %>%
   
   ylab('Sum of 40 PAHs (ng/g)') +
   xlab('Year')
+plt
+```
+
+![](SWAT_totals_graphics_files/figure-gfm/pah_trend_grpahic-1.png)<!-- -->
+
+``` r
 ggsave('figures/pah_40_trend.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
 
@@ -379,7 +386,7 @@ ggsave('figures/pah_40_trend.pdf', device = cairo_pdf, width = 5, height = 4)
 add_refs(plt, parm = 'PAH40', whch = c(2,4))
 ```
 
-![](SWAT_totals_graphics_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](SWAT_totals_graphics_files/figure-gfm/pah_trend_add_annotations-1.png)<!-- -->
 
 ``` r
 ggsave('figures/pah_40_trend_w_refs.pdf', device = cairo_pdf, width = 5, height = 4)
@@ -432,7 +439,7 @@ add_refs(plt, parm = 'PCB21', whch = c(2,4), sz = 3)
     ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
     ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
 
-![](SWAT_totals_graphics_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](SWAT_totals_graphics_files/figure-gfm/pcb_add_annotations-1.png)<!-- -->
 
 ``` r
 ggsave('figures/swat_pcbs_recent.pdf', device = cairo_pdf, width = 5, height = 4)
@@ -464,7 +471,7 @@ plt
 
     ## `geom_smooth()` using formula 'y ~ x'
 
-![](SWAT_totals_graphics_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](SWAT_totals_graphics_files/figure-gfm/pcb_trend-1.png)<!-- -->
 
 # Combined Graphic
 
@@ -475,8 +482,9 @@ reference data frames.
 
 We filter the references to only the 85th percentile values. Since we
 are only showing the 85th percentile values, we can use shorter, more
-informative labels. We try a couple of alternatives. \#\# Create Combo
-Data
+informative labels. We try a couple of alternatives.
+
+## Create Combo Data
 
 ``` r
 combo_data <- pah_recent_data %>%
@@ -504,7 +512,7 @@ combo_refs <- references %>%
 
 ``` r
 # Establish named labels
-  labs <- c('PAHs', 'PCBs')
+  labs <- c('Benchmark PAHs', 'Benchmark PCBs')
   names(labs) <- c("pah40", "swat_pcbs")
   
 plt <- combo_data %>%
@@ -536,7 +544,7 @@ plt
 
     ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
 
-![](SWAT_totals_graphics_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](SWAT_totals_graphics_files/figure-gfm/combo_graphic-1.png)<!-- -->
 
 ## Add Annotations
 
@@ -558,7 +566,7 @@ plt +
 
     ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
 
-![](SWAT_totals_graphics_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](SWAT_totals_graphics_files/figure-gfm/combo_add_annotations-1.png)<!-- -->
 
 ``` r
 ggsave('figures/combo_recent.pdf', device = cairo_pdf, width = 5, height = 4)  

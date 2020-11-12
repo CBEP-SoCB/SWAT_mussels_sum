@@ -94,7 +94,7 @@ swat_totals <- read_csv(file.path(sibling, fn),
 ```
 
 
-```{r}
+```{r list_parameters}
 unique(swat_totals$parameter)
 ```
 
@@ -112,7 +112,7 @@ monitoring programs, as published by Leblanc et al. 2009.
 We copied benchmark tables from (an on-line version of) Leblanc et al. 2009 into
 our excel spreadsheet, and read those benchmarks in here.
 
-```{r}
+```{r load_refs}
 references <- read_excel(file.path(sibling,"Parameter List.xlsx"), 
                              sheet = "Organic Comparisons",
                          range = 'a3:f8') %>%
@@ -123,7 +123,7 @@ references <- read_excel(file.path(sibling,"Parameter List.xlsx"),
 
 ## Load Location Information
 And add a short location name for figures.
-```{r}
+```{r  load_locations}
 locations <- read_csv(file.path(sibling,"sites_spatial.csv"), 
     col_types = cols(SITESEQ = col_skip(), 
         LAT = col_skip(), LONG = col_skip())) %>%
@@ -152,7 +152,7 @@ locations <- read_csv(file.path(sibling,"sites_spatial.csv"),
 
 ### Add Short Location Names
 Adding short location names.
-```{r}
+```{r short_locs}
 swat_totals <- swat_totals %>%
   mutate(short_locs = locations$short_locs[match(sitecode, locations$SITECODE)])
 
@@ -168,7 +168,7 @@ These functions do not properly account for multiple plots due to faceting, but
 they work for simple plots.  It is curious that the ranges, which must be
 useful for modifying plots in many settings, are buried so deeply in a complex
 data structure, and not exposed through the API.
-```{r}
+```{r utility_fxn_axis_ranges}
 get_xrange <- function(p) {
   ggp <- ggplot_build(p)
   return(ggp$layout$panel_params[[1]]$x.range)
@@ -185,7 +185,7 @@ The following function positions annotations at 2.5% of the x range from the
 left edge. That positioning could be relegate to a parameter.  This function
 could be generalized by handling dots, but it's not clear whether the dots
 should be directed to the lines or to the text annotations.
-```{r}
+```{r utility_fxn_ad_annot}
 add_refs <- function(plt, parm = 'PAH40', whch = c(1:4), sz = 3) {
   plt2 <- plt
   # Extract x range and calculate annotation position
@@ -221,7 +221,7 @@ approximates total PAHs fairly well. The sum is highly correlated with total
 PAHs, and amounts to about 75 or 80 percent of the total.  Our primary interest
 here to compare observations to benchmarks.
 ## Create working data
-```{r}
+```{r working_pah_data}
 pah_data <- swat_totals %>%
   filter(grepl('pah', parameter))
 
@@ -244,7 +244,7 @@ The default choice of `binwidth` works.  Exploring other `binwidth`s shows that
 The result is that to ensure graphic similarity between the PAH and PCB graphics,
 it is most convenient to stick with the default settings, despite the warning
 message.
-```{r fig.width = 5, fig.height = 4}
+```{r pah_graphic, fig.width = 5, fig.height = 4}
 plt <- pah_recent_data %>%
   filter(parameter == 'pah40') %>%
   
@@ -267,13 +267,13 @@ plt <- pah_recent_data %>%
 plt
 ```
 ### Add Annotations
-```{r fig.width = 5, fig.height = 4}
+```{r pah_add_annotations, fig.width = 5, fig.height = 4}
 add_refs(plt, parm = 'PAH40', whch = c(2,4), sz = 3)
 ggsave('figures/pah_40_recent.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
 
 ## Trend Graphic
-```{r fig.width = 5, fig.height = 4}
+```{r pah_trend_grpahic, fig.width = 5, fig.height = 4}
 plt <- pah_trend_data %>%
   filter(parameter == 'pah40') %>%
   
@@ -293,18 +293,19 @@ plt <- pah_trend_data %>%
   
   ylab('Sum of 40 PAHs (ng/g)') +
   xlab('Year')
+plt
 ggsave('figures/pah_40_trend.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
 
 ### Add Annotations (Unused)
-```{r fig.width = 5, fig.height = 4}
+```{r pah_trend_add_annotations, fig.width = 5, fig.height = 4}
 add_refs(plt, parm = 'PAH40', whch = c(2,4))
 ggsave('figures/pah_40_trend_w_refs.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
 
 # PCBs
 ## Create Working Data
-```{r}
+```{r pcb_working_data}
 pcb_data <- swat_totals %>%
   filter(grepl('pcb', parameter))
 
@@ -317,7 +318,7 @@ pcb_trend_data <- pcb_data %>%
 ```
 
 ## Recent Conditions Dotplot
-```{r fig.width = 5, fig.height = 4}
+```{r pcb_graphic, fig.width = 5, fig.height = 4}
 plt <- pcb_recent_data %>%
   filter(parameter == 'swat_pcbs') %>%
   
@@ -339,7 +340,7 @@ plt <- pcb_recent_data %>%
   xlab('')
 ```
 
-```{r fig.width = 5, fig.height = 4}
+```{r pcb_add_annotations, fig.width = 5, fig.height = 4}
 add_refs(plt, parm = 'PCB21', whch = c(2,4), sz = 3)
 ggsave('figures/swat_pcbs_recent.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
@@ -347,7 +348,7 @@ ggsave('figures/swat_pcbs_recent.pdf', device = cairo_pdf, width = 5, height = 4
 
 
 ## Trend Graphic (Unused)
-```{r}
+```{r pcb_trend}
 plt <- pcb_trend_data %>%
   filter(parameter == 'swat_pcbs') %>%
   
@@ -375,8 +376,9 @@ so parameter values must match across the data and reference data frames.
 We filter the references to only the 85th percentile values.  Since we are only
 showing the 85th percentile values, we can use shorter, more informative labels.
 We try a couple of alternatives.
+
 ## Create Combo Data
-```{r}
+```{r combo_working_data}
 combo_data <- pah_recent_data %>%
   bind_rows(pcb_recent_data) %>%
   filter(parameter %in% c('swat_pcbs', 'pah40'))%>%
@@ -399,9 +401,9 @@ combo_refs <- references %>%
 ```
 
 ## Recent Conditions Dotplot
-```{r fig.width = 5, fig.height = 4}
+```{r combo_graphic, fig.width = 5, fig.height = 4}
 # Establish named labels
-  labs <- c('PAHs', 'PCBs')
+  labs <- c('Benchmark PAHs', 'Benchmark PCBs')
   names(labs) <- c("pah40", "swat_pcbs")
   
 plt <- combo_data %>%
@@ -432,7 +434,7 @@ plt
 ```
 
 ## Add Annotations
-```{r fig.width = 5, fig.height = 4}
+```{r combo_add_annotations, fig.width = 5, fig.height = 4}
 plt +
   geom_hline(data = combo_refs, 
              aes(yintercept = value),

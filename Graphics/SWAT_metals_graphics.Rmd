@@ -102,7 +102,7 @@ library(LCensMeans)
 ## Capitalise Strings
 `This`convert_caps()` splits a string, capitalizes the first character and
 uncaps the rest.  FOr one word strings, this correspondes to "title case".
-```{r}
+```{r utility_fxn_capitalize}
 simpleCap <- function(x) {
   s <- strsplit(x, " ")[[1]]
   paste(toupper(substring(s, 1,1)), tolower(substring(s, 2)),
@@ -131,7 +131,7 @@ Getting the column types right improves load speed. Much of the
 data is qualitative, and can't be readily handled in R, so we delete it. To save
 on keystrokes, we also clean up the parameter names.
 
-```{r}
+```{r copy_data}
 swat_metals <- read_csv(file.path(sibling, fn),
                         col_types = cols(
                           .default = col_character(),
@@ -170,62 +170,52 @@ National Status And trends monitoring programs, as published by Leblanc et al.
 We copied benchmark tables from (an on-line version of) Leblanc et al. 2009 into
 our excel spreadsheet.
 
-In addition, DEP reports on a number of health thresholds, based on "FTALs" --
-MCDC Fish Tissue Action Levels.  They are not tabulated in the report.
+That document refers to "MCDC Fish Tissue Action Levels." and FDA Action Levels.
+After some digging, we found a document on the Maine CDC website that
+corresponds to (most or all of) the FTALs reported by DEP.
 
-After some digging on-line, we found a document that corresponds to the FTALs
-reported by DEP. we copied those values by hand onto the Excel spreadsheet,
-and reorganized the spreadsheet.
+**ALL HEALTH_RELATED THRESHOLDS ARE EXPRESSWD ON A WET WEIGHT BASIS**
 
->  Maine Center for Disease Control. 2001.  Bureau of Health Fish Tissue Action
-   Levels.
-   https://www.maine.gov/dhhs/mecdc/environmental-health/eohp/fish/documents/action-levels-writeup.pdf.
+>  Maine Center for Disease Control. 2001.  Bureau of Health Fish Tissue Action Levels. 
+   https://www.maine.gov/dhhs/mecdc/environmental-health/eohp/fish/documents/action-levels-writeup.pdf. 
    Accessed 11/10/2020.
 
-```{r}
+```{r load_ref_values}
 references <- read_excel(file.path(sibling,"Parameter List.xlsx"), 
                              sheet = "Metals Comparisons") %>%
   filter(! is.na(Reference_ugg)) %>%
   mutate(Reference_ugg = sub(' 2008', '', Reference_ugg))
 ```
-We will use only three of the reference values:  
+We will use only two of the reference values:  
 *  "NS&T 85th Percentile"  
 *  "Gulfwatch 85th Percentile"  
-*  "Non-Cancer FTAL ug/g"  
+
+The Health -based metrics are valuable for comparison, but they are expressed
+on a wet weight basis, and so can not be shown on one graph with the other
+reference levels.
 
 We add shorter names for graphics
-```{r}
+```{r add_short_ref_names}
 references <- references %>%
   mutate(short_ref = case_when(
-      Reference_ugg == 'Non-Cancer FTAL ug/g'       ~ 'Consumption Advisory',
       Reference_ugg == 'NS&T 85th Percentile'       ~ 'National Comparison',
       Reference_ugg == 'Gulfwatch 85th Percentile'  ~ 'Gulf of Maine Comparison'
   ))
 ```
 
-
 ### Pivot Most Important References to Long Form
 The long form annotation data allows us to add annotations to faceted plots in a
 simple way.  While we are at it, we create better names for some reference
 thresholds.
-```{r}
+```{r long_form_refs}
 ref_long <- references %>%
-  filter(grepl('85', Reference_ugg) |
-           Reference_ugg == "Non-Cancer FTAL ug/g") %>%
-  # select(-short_ref) %>%
-  # mutate(short_ref = factor(Reference_ugg,
-  #                           levels = c("Non-Cancer FTAL ug/g",
-  #                                      'NS&T 85th Percentile',
-  #                                      'Gulfwatch 85th Percentile'),
-  #                           labels = c("Consumption Advisory",
-  #                                      'National Comparison',
-  #                                      'Gulf of Maine Comparison'))) %>%
+  filter(grepl('85', Reference_ugg)) %>%
   pivot_longer(cols = Silver:Zinc, names_to = 'parameter', values_to = 'value')
 ```
 
 ## Load Location Information
 And add a short location names for figures.
-```{r}
+```{r location_info}
 locations <- read_csv(file.path(sibling,"sites_spatial.csv"), 
     col_types = cols(SITESEQ = col_skip(), 
         LAT = col_skip(), LONG = col_skip())) %>%
@@ -251,40 +241,25 @@ locations <- read_csv(file.path(sibling,"sites_spatial.csv"),
                       "Quahog Bay",
                       "Long Island"))
   
-```
-
-### Add Short Location Names
-Adding short location names  and creating a lookup table to facilitate later
-graphics.  These are probably not both necessary.
-```{r}
 swat_metals <- swat_metals %>%
   mutate(short_locs = locations$short_locs[match(sitecode,
                                                  locations$SITECODE)]) %>%
   mutate(short_locs = factor(short_locs,
                              levels = c('Navy Pier', 'Mare Brook', 'Mill Creek',
                                         'East End', 'Spring Point')))
-```
-
-```{r}
 rm(locations)
 ```
-
-We have few sites with good temporal coverage.  Most sites were only sampled
-once. The high frequency sites (three or more sample years) include:
-*  CBEEEE   -- 
-*  CBMCMC
-*  CBSPSP
 
 # Data Since 2010
 Give the paucity of data and sited from 2015 through 2019, we consider "recent"
 data to include the last 10 years, or 2010 through 2019.
-```{r}
+```{r recent_data}
 recent_data <- swat_metals %>%
   filter(year >= 2010)
 ```
 
-## Preliminary Graphic
-```{r}
+## Recents Graphic
+```{r recent_graphic}
 plt <- ggplot(recent_data,
               aes(short_locs, conc_HALF)) +
   geom_point(color = cbep_colors()[1], alpha = 0.5) +
@@ -302,7 +277,7 @@ plt <- ggplot(recent_data,
         panel.border = element_rect(color = 'gray', fill = NA, size = 0.25))
 ```
 
-```{r fig.width = 7, fig.height = 5}
+```{r recent_add_refs, fig.width = 7, fig.height = 5}
 plt +
   geom_hline(mapping = aes(yintercept = value,
                  lty = short_ref, color = short_ref),
@@ -312,7 +287,7 @@ plt +
 ```
 
 ## Means and Standard Errors
-```{r}
+```{r recent_means}
 plt <- recent_data %>%
   ggplot(aes(short_locs, conc_ML)) +
   stat_summary(fun.data=mean_sdl, fun.args = list(mult=1), 
@@ -330,7 +305,7 @@ plt <- recent_data %>%
         panel.border = element_rect(color = 'gray', fill = NA, size = 0.25))
 ```
 
-```{r fig.width = 7, fig.height = 5}
+```{r recent_means_add_refs, fig.width = 7, fig.height = 5}
 plt +
   geom_hline(mapping = aes(yintercept = value,
                  lty = short_ref, color = short_ref),
@@ -340,14 +315,20 @@ plt +
 ```
 
 # Trend Analyses
-```{r}
+We have few sites with good temporal coverage.  Most sites were only sampled
+once. The high frequency sites (three or more sample years) include:
+*  CBEEEE   -- 
+*  CBMCMC
+*  CBSPSP
+
+```{r trend_data}
 sites <- c('CBEEEE', 'CBMCMC', 'CBSPSP')
 trend_data <- swat_metals %>%
   filter(sitecode %in% sites)
 ```
 
-## Preliminary Graphic
-```{r}
+## Trend Graphic
+```{r trend_graphic}
 plt <- trend_data %>%
   
   ggplot(aes(year, conc_HALF)) +
@@ -381,7 +362,7 @@ different models.
 The following table summarizes results of those models.
 (The following was transcribed by hand, which is error-prone, and won't update
 automatically).
-```{r}
+```{r results_table}
 trends_table <- tribble(
 ~Symbol, ~Element, ~`Linear Trend`, ~`Kendalls TAU`, ~ `Step Trend`,
 'Ag', 'Silver',   'Declining', 'No Trend',   'Declining at Spring Point*',
@@ -396,9 +377,7 @@ trends_table <- tribble(
 'Pb', 'Lead',     'No Trend',  'No Trend',   'No Trend',
 'Se', 'Selenium', 'No Trend',  'No Trend',   'No Trend',
 'Zn',	'Zinc',     'No Trend',  'No Trend',   'No Trend')
-```
 
-```{r}
 knitr::kable(trends_table)
 ```
 -  * Silver results are influenced by non detects. Elevated detection limits
@@ -428,7 +407,7 @@ significant results that are probably meaningless.
 
 ## Summary Table
 We can summarize results as follows:
-```{r}
+```{r summary_table}
 sum_table <- tribble(
   ~Metal, ~Result,
   'Arsenic',  'Increasing',
