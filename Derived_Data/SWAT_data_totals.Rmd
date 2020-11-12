@@ -437,7 +437,7 @@ dioxin_data <- swat_data %>%
   summarize(concentration = sum(conc, na.rm = TRUE),
             conc_ngg = concentration,
             conc_ugg = concentration / 1000,
-            parameter = 'Total Dioxins and Furans',
+            parameter = 'TOTAL Dioxins',
             units     = 'NG/G',
             method = 'Calculated',
             .groups   = 'drop') 
@@ -576,8 +576,8 @@ totals_data <- swat_data %>%
 ## Add "SWAT PCBs", Dioxin and DDT Totals
 ```{r}
 totals_data <- totals_data %>%
-  bind_rows(pcb_swat)
-  bind_rows(dioxin_data)
+  bind_rows(pcb_swat) %>%
+  bind_rows(dioxin_data) %>%
   bind_rows(ddt_data)
 ```
 

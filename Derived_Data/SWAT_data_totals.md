@@ -644,7 +644,7 @@ dioxin_data <- swat_data %>%
   summarize(concentration = sum(conc, na.rm = TRUE),
             conc_ngg = concentration,
             conc_ugg = concentration / 1000,
-            parameter = 'Total Dioxins and Furans',
+            parameter = 'TOTAL Dioxins',
             units     = 'NG/G',
             method = 'Calculated',
             .groups   = 'drop') 
@@ -652,12 +652,12 @@ dioxin_data
 ```
 
     ## # A tibble: 4 x 7
-    ##   code          concentration conc_ngg  conc_ugg parameter        units method  
-    ##   <chr>                 <dbl>    <dbl>     <dbl> <chr>            <chr> <chr>   
-    ## 1 CBPRMT_REP_1~        0.292    0.292  0.000292  Total Dioxins a~ NG/G  Calcula~
-    ## 2 CBPRMT_REP_2~        0.0942   0.0942 0.0000942 Total Dioxins a~ NG/G  Calcula~
-    ## 3 CBPRMT_REP_3~        0.0900   0.0900 0.0000900 Total Dioxins a~ NG/G  Calcula~
-    ## 4 CBPRMT_REP_4~        0.0886   0.0886 0.0000886 Total Dioxins a~ NG/G  Calcula~
+    ##   code             concentration conc_ngg  conc_ugg parameter    units method   
+    ##   <chr>                    <dbl>    <dbl>     <dbl> <chr>        <chr> <chr>    
+    ## 1 CBPRMT_REP_1_20~        0.292    0.292  0.000292  TOTAL Dioxi~ NG/G  Calculat~
+    ## 2 CBPRMT_REP_2_20~        0.0942   0.0942 0.0000942 TOTAL Dioxi~ NG/G  Calculat~
+    ## 3 CBPRMT_REP_3_20~        0.0900   0.0900 0.0000900 TOTAL Dioxi~ NG/G  Calculat~
+    ## 4 CBPRMT_REP_4_20~        0.0886   0.0886 0.0000886 TOTAL Dioxi~ NG/G  Calculat~
 
 Note we only have Dioxin Data from four samples, all from one site and
 one year.
@@ -858,42 +858,10 @@ totals_data <- swat_data %>%
 
 ``` r
 totals_data <- totals_data %>%
-  bind_rows(pcb_swat)
-  bind_rows(dioxin_data)
-```
-
-    ## # A tibble: 4 x 16
-    ## # Groups:   code [4]
-    ##   site_seq sitecode site   year sample_date sample_id code  samp_pt_name lab  
-    ##      <dbl> <chr>    <chr> <dbl> <date>      <chr>     <chr> <chr>        <chr>
-    ## 1    77495 CBPRMT   PRES~  2008 2008-11-18  CBPRMT R~ CBPR~ REP 1        AXYS~
-    ## 2    77495 CBPRMT   PRES~  2008 2008-11-18  CBPRMT R~ CBPR~ REP 2        AXYS~
-    ## 3    77495 CBPRMT   PRES~  2008 2008-11-18  CBPRMT R~ CBPR~ REP 3        AXYS~
-    ## 4    77495 CBPRMT   PRES~  2008 2008-11-18  CBPRMT R~ CBPR~ REP 4        AXYS~
-    ## # ... with 7 more variables: lab_id <chr>, concentration <dbl>, conc_ngg <dbl>,
-    ## #   conc_ugg <dbl>, parameter <chr>, units <chr>, method <chr>
-
-``` r
+  bind_rows(pcb_swat) %>%
+  bind_rows(dioxin_data) %>%
   bind_rows(ddt_data)
 ```
-
-    ## # A tibble: 76 x 16
-    ## # Groups:   code, lab_id [76]
-    ##    site_seq sitecode site   year sample_date sample_id code  samp_pt_name lab  
-    ##       <dbl> <chr>    <chr> <dbl> <date>      <chr>     <chr> <chr>        <chr>
-    ##  1    76091 CBJWPB   JEWE~  2007 2007-10-22  CBJWPB R~ CBJW~ REP 1        AXYS~
-    ##  2    76091 CBJWPB   JEWE~  2007 2007-10-22  CBJWPB R~ CBJW~ REP 2        AXYS~
-    ##  3    76091 CBJWPB   JEWE~  2007 2007-10-22  CBJWPB R~ CBJW~ REP 3        AXYS~
-    ##  4    76091 CBJWPB   JEWE~  2007 2007-10-22  CBJWPB R~ CBJW~ REP 4        AXYS~
-    ##  5    76073 CBANAN   FALM~  2007 2007-10-18  CBANAN R~ CBAN~ REP 1        AXYS~
-    ##  6    76073 CBANAN   FALM~  2007 2007-10-18  CBANAN R~ CBAN~ REP 2        AXYS~
-    ##  7    76073 CBANAN   FALM~  2007 2007-10-18  CBANAN R~ CBAN~ REP 3        AXYS~
-    ##  8    76073 CBANAN   FALM~  2007 2007-10-18  CBANAN R~ CBAN~ REP 4        AXYS~
-    ##  9    70678 CBMCMC   MILL~  2009 2009-11-10  CBMCMC R~ CBMC~ REP 1        AXYS~
-    ## 10    70678 CBMCMC   MILL~  2009 2009-11-10  CBMCMC R~ CBMC~ REP 2        AXYS~
-    ## # ... with 66 more rows, and 7 more variables: lab_id <chr>,
-    ## #   concentration <dbl>, conc_ngg <dbl>, conc_ugg <dbl>, parameter <chr>,
-    ## #   units <chr>, method <chr>
 
 # Save Totals Data
 
