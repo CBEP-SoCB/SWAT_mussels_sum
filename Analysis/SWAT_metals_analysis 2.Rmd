@@ -153,7 +153,6 @@ swat_metals <- read_csv(file.path(sibling, fn),
   mutate(parameter = convert_caps(parameter))
 ```
 
-
 ```{r}
 unique(swat_metals$parameter)
 ```
@@ -245,7 +244,6 @@ swat_metals <- swat_metals %>%
                                         'East End', 'Spring Point')))
 rm(locations)
 ```
-
 
 # Evaluating Non-detects
 ```{r}
@@ -363,7 +361,6 @@ plt
 
 ```
 
-
 ```{r fig.width = 7, fig.height = 5}
 plt +
   geom_hline(mapping = aes(yintercept = value,
@@ -402,6 +399,7 @@ plt <- trend_data %>%
         panel.border = element_rect(color = 'gray', fill = NA, size = 0.25))
 plt
 ```
+
 So, results appear to be mixed, which complicates reporting.
 
 We pull out results of linear models and robust linear models.
@@ -425,6 +423,7 @@ So, statistically significant regressions include the following
 sig_lms <- names(lm_p_vals[lm_p_vals<0.025])
 sig_lms
 ```
+
 ## Robust Regression
 ```{r}
 lmods <- list()
@@ -489,6 +488,7 @@ rm(lmods, tmp, mod, mod2)
 Here are the final, selected models.  Year is  selected in most of the models.
 That is not the same as year being statistically significant, but it is
 suggestive.
+
 ```{r}
 lapply(mods$step_anova, function(x) x$call)
 ```
@@ -531,6 +531,7 @@ lemts <- list()
 ```{r}
 lemts
 ```
+
 ## Results Table
 We scan those results for:
 1. Slopes from emtrends where the confidence interval excludes zero
@@ -580,7 +581,6 @@ trends_table <- tribble(
 So, results across multiple tests are fairly consistent.  But we should be
 careful because there are multiple comarisons here, so by chance we expect some
 significant results that are probably meaningless.
-
 
 ```{r}
 knitr::kable(trends_table)
