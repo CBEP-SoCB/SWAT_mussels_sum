@@ -1,20 +1,21 @@
 Review of Maine DEP EGAD Mussel Tissue Toxics Data Sampling Dates
 ================
 Curtis C. Bohlen, Casco Bay Estuary Partnership
-9/10/2020
+4/01/2021
 
-  - [Introduction](#introduction)
-  - [Load Libraries](#load-libraries)
-  - [Load Data](#load-data)
-      - [Establish Folder References](#establish-folder-references)
-      - [Copy Data](#copy-data)
-      - [Remove Duplicates](#remove-duplicates)
-  - [Sampling Dates and Sites](#sampling-dates-and-sites)
-      - [How Many Times has Each Site Been
+-   [Introduction](#introduction)
+-   [Load Libraries](#load-libraries)
+-   [Load Data](#load-data)
+    -   [Establish Folder References](#establish-folder-references)
+    -   [Copy Data](#copy-data)
+    -   [Remove Duplicates](#remove-duplicates)
+-   [Sampling Dates and Sites](#sampling-dates-and-sites)
+    -   [How Many Times has Each Site Been
         Sampled?](#how-many-times-has-each-site-been-sampled)
-      - [Period of Data](#period-of-data)
-      - [How Many Sampling Events Each
+    -   [Period of Data](#period-of-data)
+    -   [How Many Sampling Events Each
         Year?](#how-many-sampling-events-each-year)
+    -   [Look at Recent Data](#look-at-recent-data)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -27,7 +28,7 @@ database of environmental data called “EGAD”. Citizens can request data
 from the database through DEP staff.
 
 CBEP requested data from DEP on levels of toxic contaminants in
-shellfish tissue samples from Casco Bay. The result is a large (\>
+shellfish tissue samples from Casco Bay. The result is a large (&gt;
 100,000 line) excel spreadsheet containing data from about 40 sampling
 dates from 20 locations, over a period of more than 15 years.
 
@@ -45,14 +46,14 @@ through the data to understand its structure.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages --------------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
 
-    ## v ggplot2 3.3.2     v purrr   0.3.4
-    ## v tibble  3.0.3     v dplyr   1.0.2
+    ## v ggplot2 3.3.3     v purrr   0.3.4
+    ## v tibble  3.0.5     v dplyr   1.0.3
     ## v tidyr   1.1.2     v stringr 1.4.0
-    ## v readr   1.3.1     v forcats 0.5.0
+    ## v readr   1.4.0     v forcats 0.5.0
 
-    ## -- Conflicts ------------------------------------------------------------------------------------------ tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -124,7 +125,7 @@ kable(dates_data)
 ```
 
 | Code   | Site                               | Year | Date       |
-| :----- | :--------------------------------- | ---: | :--------- |
+|:-------|:-----------------------------------|-----:|:-----------|
 | CBFROR | FORE RIVER OUTER                   | 2003 | 2003-10-01 |
 | CBRYMT | ROYAL RIVER MOUTH                  | 2003 | 2003-10-01 |
 | CBGDSW | SOUTHWEST END GREAT DIAMOND ISLAND | 2003 | 2003-10-01 |
@@ -190,7 +191,7 @@ dates_data %>%
 ```
 
 | Site                               | Period between First and Last Samples (Years) | Total Number of Sampling Events | Maximum Number of Samples in One Year |
-| :--------------------------------- | --------------------------------------------: | ------------------------------: | ------------------------------------: |
+|:-----------------------------------|----------------------------------------------:|--------------------------------:|--------------------------------------:|
 | BACK BAY                           |                                             1 |                               1 |                                     1 |
 | BRUNSWICK MARE BROOK DRAINAGE      |                                            10 |                               3 |                                     1 |
 | COCKTAIL COVE GREAT DIAMOND ISLAND |                                             1 |                               1 |                                     1 |
@@ -216,10 +217,10 @@ So, there are basically TWO sites which have been sampled fairly
 regularly, and a handful of sites sampled more than twice. Trend
 analysis may be possible looking at:
 
-  - Mare Brook (three times over ten years)  
-  - East End Beach (six times over eleven years)  
-  - Mill Creek (Six Times over twelve years)  
-  - Spring Point (four times over nine years)
+-   Mare Brook (three times over ten years)  
+-   East End Beach (six times over eleven years)  
+-   Mill Creek (Six Times over twelve years)  
+-   Spring Point (four times over nine years)
 
 Notice that the “Fore River Outer” site was sampled three times in one
 year.
@@ -241,11 +242,9 @@ dates_data %>%
   summarize(count = n())
 ```
 
-    ## `summarise()` ungrouping output (override with `.groups` argument)
-
     ## # A tibble: 13 x 2
     ##     Year count
-    ##    <dbl> <int>
+    ##  * <dbl> <int>
     ##  1  2003     4
     ##  2  2006     4
     ##  3  2007     4
@@ -259,3 +258,33 @@ dates_data %>%
     ## 11  2015     2
     ## 12  2016     1
     ## 13  2017     2
+
+## Look at Recent Data
+
+Recent data is since 2010. \#\# How Many Times has Each Site Been
+Sampled?
+
+``` r
+dates_data %>%
+  filter(Year > 2009) %>%
+  group_by(Site, Year) %>%
+  mutate(count = n())  %>%
+  ungroup() %>%
+  group_by(Site) %>%
+  summarize(spread = range(Year)[[2]]-range(Year)[[1]] + 1,
+            nsamps = n(),
+            maxsamps = max(count),
+            .groups = 'drop') %>%
+  kable(col.names = c('Site',
+                      'Period between First and Last Samples (Years)',
+                      'Total Number of Sampling Events',
+                      'Maximum Number of Samples in One Year'))
+```
+
+| Site                          | Period between First and Last Samples (Years) | Total Number of Sampling Events | Maximum Number of Samples in One Year |
+|:------------------------------|----------------------------------------------:|--------------------------------:|--------------------------------------:|
+| BRUNSWICK MARE BROOK DRAINAGE |                                             3 |                               2 |                                     1 |
+| EAST END BEACH                |                                             7 |                               4 |                                     1 |
+| MILL CREEK                    |                                             7 |                               3 |                                     1 |
+| NAVY PIER                     |                                             1 |                               1 |                                     1 |
+| S PORTLAND SPRING POINT       |                                             6 |                               3 |                                     1 |

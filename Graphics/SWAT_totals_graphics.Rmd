@@ -93,7 +93,6 @@ swat_totals <- read_csv(file.path(sibling, fn),
   mutate(parameter = sub(' ', '_', parameter))
 ```
 
-
 ```{r list_parameters}
 unique(swat_totals$parameter)
 ```
@@ -155,7 +154,6 @@ Adding short location names.
 ```{r short_locs}
 swat_totals <- swat_totals %>%
   mutate(short_locs = locations$short_locs[match(sitecode, locations$SITECODE)])
-
 ```
 
 # Functions to add Reference Annotations

@@ -3,24 +3,24 @@ Comparison of PCBs from EGAD Mussel Toxics Data to Health Thresholds
 Curtis C. Bohlen, Casco Bay Estuary Partnership
 11/12/2020
 
-  - [Introduction](#introduction)
-      - [PCB TEQ comparisons.](#pcb-teq-comparisons.)
-  - [Related Health Standards](#related-health-standards)
-  - [Load Libraries](#load-libraries)
-      - [Establish Folder Reference](#establish-folder-reference)
-      - [Copy Data](#copy-data)
-      - [Remove duplicates](#remove-duplicates)
-      - [Simplify Data and Add Unique Sample
+-   [Introduction](#introduction)
+    -   [PCB TEQ comparisons.](#pcb-teq-comparisons.)
+-   [Related Health Standards](#related-health-standards)
+-   [Load Libraries](#load-libraries)
+    -   [Establish Folder Reference](#establish-folder-reference)
+    -   [Copy Data](#copy-data)
+    -   [Remove duplicates](#remove-duplicates)
+    -   [Simplify Data and Add Unique Sample
         Codes](#simplify-data-and-add-unique-sample-codes)
-      - [Add Class to the Working Simplified
+    -   [Add Class to the Working Simplified
         Data](#add-class-to-the-working-simplified-data)
-  - [Create PCB-only Data – Wet Weight
-    Basis\!](#create-pcb-only-data-wet-weight-basis)
-      - [Load Location Information](#load-location-information)
-      - [Data Subsets](#data-subsets)
-      - [Data Since 2010](#data-since-2010)
-  - [PCB Graphic](#pcb-graphic)
-  - [TEQ Graphic](#teq-graphic)
+-   [Create PCB-only Data – Wet Weight
+    Basis!](#create-pcb-only-data-wet-weight-basis)
+    -   [Load Location Information](#load-location-information)
+    -   [Data Subsets](#data-subsets)
+    -   [Data Since 2010](#data-since-2010)
+-   [PCB Graphic](#pcb-graphic)
+-   [TEQ Graphic](#teq-graphic)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -33,7 +33,7 @@ database of environmental data called “EGAD”. Citizens can request data
 from the database through DEP staff.
 
 CBEP requested data from DEP on levels of toxic contaminants in
-shellfish tissue samples from Casco Bay. The result is a large (\>
+shellfish tissue samples from Casco Bay. The result is a large (&gt;
 100,000 line) excel spreadsheet containing data from about 40 sampling
 dates from 20 locations, over a period of more than 15 years.
 
@@ -50,8 +50,8 @@ TEQs (Toxic Equivalents) use weighted sums of concentrations of toxic
 chemicals used to estimate overall toxicity of mixtures. The idea is
 that by weighting concentrations by very rough (order of magnitude)
 weights based on relative toxicity (called Toxic Equivalency Factors or
-“TEFs”), you can get some idea of whether a mixture poses toxic risk
-or not. TEQs are compared to published toxicity benchmarks.
+“TEFs”), you can get some idea of whether a mixture poses toxic risk or
+not. TEQs are compared to published toxicity benchmarks.
 
 # Related Health Standards
 
@@ -80,7 +80,7 @@ The relevant Maine health reference level are these (1 ppb = 1 ng/g):
 **THESE REFERENCE LEVELS ARE ON A WET WEIGHT BASIS**
 
 | Chemical Group | Non-Cancer Action Level | Cancer Action Level  | Source |
-| -------------- | ----------------------- | -------------------- | ------ |
+|----------------|-------------------------|----------------------|--------|
 | PCBs           | 11 ppb                  | 43 ppb               | MCDC   |
 | Dioxins        | 0.0015 ppb              | 0.0019 ppb           | MCDC   |
 | TEQ            |                         | 0.4 pg/g = .0004 ppb | DEP    |
@@ -91,14 +91,14 @@ The relevant Maine health reference level are these (1 ppb = 1 ng/g):
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ----------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
 
-    ## v ggplot2 3.3.2     v purrr   0.3.4
-    ## v tibble  3.0.3     v dplyr   1.0.2
+    ## v ggplot2 3.3.3     v purrr   0.3.4
+    ## v tibble  3.0.5     v dplyr   1.0.3
     ## v tidyr   1.1.2     v stringr 1.4.0
-    ## v readr   1.3.1     v forcats 0.5.0
+    ## v readr   1.4.0     v forcats 0.5.0
 
-    ## -- Conflicts -------------------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -203,7 +203,7 @@ SWAT_simplified <- SWAT_simplified %>%
 rm(Parameter_List)
 ```
 
-# Create PCB-only Data – Wet Weight Basis\!
+# Create PCB-only Data – Wet Weight Basis!
 
 But want to restrict to PCB data only, expressed on a dry weight basis.
 We had trouble because we lost certain parameters in deriving this data
@@ -269,7 +269,7 @@ pcb_teq_data <- pcb_data %>%
 ## Data Since 2010
 
 Give the paucity of data and sited from 2015 through 2019, we consider
-“recent” data to include the lat 10 years, or 2010 throut 2019
+“recent” data to include the lat 10 years, or 2010 through 2019.
 
 ``` r
 totals_recent_data <- pcb_totals_data %>%

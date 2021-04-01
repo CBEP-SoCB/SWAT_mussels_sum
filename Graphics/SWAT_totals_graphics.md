@@ -3,31 +3,31 @@ Graphics for Organic Contaminants from EGAD Mussel Toxics Data
 Curtis C. Bohlen, Casco Bay Estuary Partnership
 11/10/2020
 
-  - [Introduction](#introduction)
-  - [Load Libraries](#load-libraries)
-  - [Load Data](#load-data)
-      - [Establish Folder References](#establish-folder-references)
-      - [Copy Data](#copy-data)
-      - [Load Reference Values](#load-reference-values)
-      - [Load Location Information](#load-location-information)
-  - [Functions to add Reference
+-   [Introduction](#introduction)
+-   [Load Libraries](#load-libraries)
+-   [Load Data](#load-data)
+    -   [Establish Folder References](#establish-folder-references)
+    -   [Copy Data](#copy-data)
+    -   [Load Reference Values](#load-reference-values)
+    -   [Load Location Information](#load-location-information)
+-   [Functions to add Reference
     Annotations](#functions-to-add-reference-annotations)
-      - [Utilities to Extract Axis
+    -   [Utilities to Extract Axis
         Ranges](#utilities-to-extract-axis-ranges)
-      - [Function for Adding
+    -   [Function for Adding
         Annotations](#function-for-adding-annotations)
-  - [PAHs](#pahs)
-      - [Recent Conditions Dotplot
+-   [PAHs](#pahs)
+    -   [Recent Conditions Dotplot
         Graphic](#recent-conditions-dotplot-graphic)
-      - [Trend Graphic](#trend-graphic)
-  - [PCBs](#pcbs)
-      - [Create Working Data](#create-working-data)
-      - [Recent Conditions Dotplot](#recent-conditions-dotplot)
-      - [Trend Graphic (Unused)](#trend-graphic-unused)
-  - [Combined Graphic](#combined-graphic)
-      - [Create Combo Data](#create-combo-data)
-      - [Recent Conditions Dotplot](#recent-conditions-dotplot-1)
-      - [Add Annotations](#add-annotations)
+    -   [Trend Graphic](#trend-graphic)
+-   [PCBs](#pcbs)
+    -   [Create Working Data](#create-working-data)
+    -   [Recent Conditions Dotplot](#recent-conditions-dotplot)
+    -   [Trend Graphic (Unused)](#trend-graphic-unused)
+-   [Combined Graphic](#combined-graphic)
+    -   [Create Combo Data](#create-combo-data)
+    -   [Recent Conditions Dotplot](#recent-conditions-dotplot-1)
+    -   [Add Annotations](#add-annotations)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -40,7 +40,7 @@ database of environmental data called “EGAD”. Citizens can request data
 from the database through DEP staff.
 
 CBEP requested data from DEP on levels of toxic contaminants in
-shellfish tissue samples from Casco Bay. The result is a large (\>
+shellfish tissue samples from Casco Bay. The result is a large (&gt;
 100,000 line) excel spreadsheet containing data from about 40 sampling
 dates from 20 locations, over a period of more than 15 years.
 
@@ -51,8 +51,8 @@ contaminants that can be related to reference values..
 
 We focus on the following analytic totals:
 
-  - Total PAHs,
-  - SWAT PCBs
+-   Total PAHs,
+-   SWAT PCBs
 
 Because they are readily compared to
 
@@ -66,14 +66,14 @@ folder.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ----------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
 
-    ## v ggplot2 3.3.2     v purrr   0.3.4
-    ## v tibble  3.0.3     v dplyr   1.0.2
+    ## v ggplot2 3.3.3     v purrr   0.3.4
+    ## v tibble  3.0.5     v dplyr   1.0.3
     ## v tidyr   1.1.2     v stringr 1.4.0
-    ## v readr   1.3.1     v forcats 0.5.0
+    ## v readr   1.4.0     v forcats 0.5.0
 
-    ## -- Conflicts -------------------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 

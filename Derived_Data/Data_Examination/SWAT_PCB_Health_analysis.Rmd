@@ -224,7 +224,7 @@ pcb_teq_data <- pcb_data %>%
 
 ## Data Since 2010
 Give the paucity of data and sited from 2015 through 2019, we consider "recent"
-data to include the lat 10 years, or 2010 throut 2019
+data to include the lat 10 years, or 2010 through 2019.
 ```{r}
 totals_recent_data <- pcb_totals_data %>%
     filter(year >= 2010)

@@ -3,23 +3,23 @@ Analysis of Metal Contaminants from EGAD Mussel Toxics Data
 Curtis C. Bohlen, Casco Bay Estuary Partnership
 11/10/2020
 
-  - [Introduction](#introduction)
-      - [Handling Non-Detects](#handling-non-detects)
-  - [Load Libraries](#load-libraries)
-  - [Utility Functions](#utility-functions)
-      - [Capitalise Strings](#capitalise-strings)
-  - [Load Data](#load-data)
-      - [Establish Folder References](#establish-folder-references)
-      - [Copy Data](#copy-data)
-      - [Load Reference Values](#load-reference-values)
-      - [Load Location Information](#load-location-information)
-  - [Data Since 2010](#data-since-2010)
-      - [Recents Graphic](#recents-graphic)
-      - [Means and Standard Errors](#means-and-standard-errors)
-  - [Trend Analyses](#trend-analyses)
-      - [Trend Graphic](#trend-graphic)
-      - [Results Table](#results-table)
-      - [Summary Table](#summary-table)
+-   [Introduction](#introduction)
+    -   [Handling Non-Detects](#handling-non-detects)
+-   [Load Libraries](#load-libraries)
+-   [Utility Functions](#utility-functions)
+    -   [Capitalise Strings](#capitalise-strings)
+-   [Load Data](#load-data)
+    -   [Establish Folder References](#establish-folder-references)
+    -   [Copy Data](#copy-data)
+    -   [Load Reference Values](#load-reference-values)
+    -   [Load Location Information](#load-location-information)
+-   [Data Since 2010](#data-since-2010)
+    -   [Recents Graphic](#recents-graphic)
+    -   [Means and Standard Errors](#means-and-standard-errors)
+-   [Trend Analyses](#trend-analyses)
+    -   [Trend Graphic](#trend-graphic)
+    -   [Results Table](#results-table)
+    -   [Summary Table](#summary-table)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -32,7 +32,7 @@ database of environmental data called “EGAD”. Citizens can request data
 from the database through DEP staff.
 
 CBEP requested data from DEP on levels of toxic contaminants in
-shellfish tissue samples from Casco Bay. The result is a large (\>
+shellfish tissue samples from Casco Bay. The result is a large (&gt;
 100,000 line) excel spreadsheet containing data from about 40 sampling
 dates from 20 locations, over a period of more than 15 years.
 
@@ -100,14 +100,14 @@ results of these analyses.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ----------------------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
 
-    ## v ggplot2 3.3.2     v purrr   0.3.4
-    ## v tibble  3.0.3     v dplyr   1.0.2
+    ## v ggplot2 3.3.3     v purrr   0.3.4
+    ## v tibble  3.0.5     v dplyr   1.0.3
     ## v tidyr   1.1.2     v stringr 1.4.0
-    ## v readr   1.3.1     v forcats 0.5.0
+    ## v readr   1.4.0     v forcats 0.5.0
 
-    ## -- Conflicts -------------------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -211,7 +211,7 @@ That document refers to “MCDC Fish Tissue Action Levels.” and FDA Action
 Levels. After some digging, we found a document on the Maine CDC website
 that corresponds to (most or all of) the FTALs reported by DEP.
 
-**ALL HEALTH\_RELATED THRESHOLDS ARE EXPRESSWD ON A WET WEIGHT BASIS**
+**ALL HEALTH\_RELATED THRESHOLDS ARE EXPRESSED ON A WET WEIGHT BASIS**
 
 > Maine Center for Disease Control. 2001. Bureau of Health Fish Tissue
 > Action Levels.
@@ -226,10 +226,10 @@ references <- read_excel(file.path(sibling,"Parameter List.xlsx"),
 ```
 
 We will use only two of the reference values:  
-\* “NS\&T 85th Percentile”  
+\* “NS&T 85th Percentile”  
 \* “Gulfwatch 85th Percentile”
 
-The Health -based metrics are valuable for comparison, but they are
+The Health-based metrics are valuable for comparison, but they are
 expressed on a wet weight basis, and so can not be shown on one graph
 with the other reference levels.
 
@@ -452,7 +452,7 @@ knitr::kable(trends_table)
 ```
 
 | Symbol | Element  | Linear Trend | Kendalls TAU | Step Trend                             |
-| :----- | :------- | :----------- | :----------- | :------------------------------------- |
+|:-------|:---------|:-------------|:-------------|:---------------------------------------|
 | Ag     | Silver   | Declining    | No Trend     | Declining at Spring Point\*            |
 | Al     | Aluminum | No Trend     | No Trend\*\* | No Trend                               |
 | As     | Arsenic  | No Trend     | Increasing   | Increasing                             |
@@ -466,24 +466,24 @@ knitr::kable(trends_table)
 | Se     | Selenium | No Trend     | No Trend     | No Trend                               |
 | Zn     | Zinc     | No Trend     | No Trend     | No Trend                               |
 
-  -   - Silver results are influenced by non detects. Elevated detection
+-   -   Silver results are influenced by non detects. Elevated detection
         limits in 2007 and to a lesser extent in 2014 dominate the
         analysis. So trends detected in these analyses are not supported
         by observed values. This problem is an excellent example of why
         we prefer to use statistically-based estimates of censored
         values.
 
-  - \*\* Aluminum shows a significant decline by `mblm()`, but not by
+-   \*\* Aluminum shows a significant decline by `mblm()`, but not by
     the closely related Kendall’s Tau (implemented in he `cor()`
     function using `method = 'kendall'`). Kendall’s Tau is our preferred
     test for significance.
 
-  - \*\*\* Copper trend at Mill Creek is due to one very high
+-   \*\*\* Copper trend at Mill Creek is due to one very high
     observation at Mill Creek in 2006. Although the trend is nominally
     statistically significant, its dependence on a single observation
     makes it less than compelling.
 
-  - \*\*\*\* Mercury confidence interval for Spring Point does not
+-   \*\*\*\* Mercury confidence interval for Spring Point does not
     include zero, but it is very close. Given uncertainty about model
     specification, we should not take the implied confidence interval
     probability (nominally 95%) very seriously. This trend should be
@@ -512,7 +512,7 @@ knitr::kable(sum_table, caption = 'Trends in Metals in Blue Mussels from Three S
 ```
 
 | Metal    | Result                                         |
-| :------- | :--------------------------------------------- |
+|:---------|:-----------------------------------------------|
 | Arsenic  | Increasing                                     |
 | Chromium | Declining at East End and Spring Point         |
 | Iron     | Declining                                      |

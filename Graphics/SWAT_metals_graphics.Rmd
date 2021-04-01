@@ -174,7 +174,7 @@ That document refers to "MCDC Fish Tissue Action Levels." and FDA Action Levels.
 After some digging, we found a document on the Maine CDC website that
 corresponds to (most or all of) the FTALs reported by DEP.
 
-**ALL HEALTH_RELATED THRESHOLDS ARE EXPRESSWD ON A WET WEIGHT BASIS**
+**ALL HEALTH_RELATED THRESHOLDS ARE EXPRESSED ON A WET WEIGHT BASIS**
 
 >  Maine Center for Disease Control. 2001.  Bureau of Health Fish Tissue Action Levels. 
    https://www.maine.gov/dhhs/mecdc/environmental-health/eohp/fish/documents/action-levels-writeup.pdf. 
@@ -190,7 +190,7 @@ We will use only two of the reference values:
 *  "NS&T 85th Percentile"  
 *  "Gulfwatch 85th Percentile"  
 
-The Health -based metrics are valuable for comparison, but they are expressed
+The Health-based metrics are valuable for comparison, but they are expressed
 on a wet weight basis, and so can not be shown on one graph with the other
 reference levels.
 

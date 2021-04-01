@@ -2,7 +2,7 @@
 title: "Review of Maine DEP EGAD Mussel Tissue Toxics Data Sampling Dates"
 subtitle: "Review of Sample Dates"
 author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
-date: "9/10/2020"
+date: "4/01/2021"
 output:
   github_document:
     toc: true
@@ -132,6 +132,7 @@ Notice that the "Fore River Outer" site was sampled three times in one year.
 ```{r}
 range(dates_data$Year)
 ```
+
 ## How Many Sampling Events Each Year?
 ```{r}
 dates_data %>%
@@ -140,3 +141,23 @@ dates_data %>%
   summarize(count = n())
 ```
 
+
+## Look at Recent Data 
+Recent data is since 2010.
+## How Many Times has Each Site Been Sampled?
+```{r}
+dates_data %>%
+  filter(Year > 2009) %>%
+  group_by(Site, Year) %>%
+  mutate(count = n())  %>%
+  ungroup() %>%
+  group_by(Site) %>%
+  summarize(spread = range(Year)[[2]]-range(Year)[[1]] + 1,
+            nsamps = n(),
+            maxsamps = max(count),
+            .groups = 'drop') %>%
+  kable(col.names = c('Site',
+                      'Period between First and Last Samples (Years)',
+                      'Total Number of Sampling Events',
+                      'Maximum Number of Samples in One Year'))
+```
