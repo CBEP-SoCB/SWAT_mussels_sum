@@ -40,7 +40,7 @@ State of the Bay graphical layouts.
 # Summary of Data Source
 
 Data is derived from the EGAD database maintained by Maine's Department of
-Environmental Protection (DEP)  Contnts include tissue toxics samples from
+Environmental Protection (DEP)  Contents include tissue toxics samples from
 location within Casco Bay.
 
 
