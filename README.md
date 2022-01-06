@@ -20,6 +20,7 @@ review, critique, learn from, and build upon CBEP science.
  "Graphics" folder.  The other two folders are only included if strictly
  necessary.
 
+Need to combine original and derived data folders since they are still separate 
 - **Original Data**.  Original data, with a "DATA_SOURCES.md" or "READ ME.txt" file
 that documents data sources.  
     **DATA IN THIS FOLDER IS AS ORIGINALLY PROVIDED OR ACCESSED.** 
