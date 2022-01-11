@@ -1,0 +1,176 @@
+---
+title: "Review of Maine DEP EGAD Mussel Tissue Toxics PAHs"
+subtitle: "PAH Analysis"
+author: "Curtis C. Bohlen, Casco Bay Estuary Partnership"
+date: "9/18/2020"
+output:
+  github_document:
+    toc: true
+    toc_depth: 2
+    fig_width: 7
+    fig_height: 5
+---
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+# Introduction
+Maine's Department of Environmental Protection (DEP) maintains a large database
+of environmental data called "EGAD".  Citizens can request data from the
+database through DEP staff.
+
+CBEP requested data from DEP on levels of toxic contaminants in shellfish
+tissue samples from Casco Bay. The result is a large (> 100,000 line) excel
+spreadsheet containing data from about 40 sampling dates from 20 locations, over
+a period of more than 15 years.
+
+Unfortunately, the data delivery contains limited metadata, so it takes some
+effort to understand the data format and analyze it correctly.
+
+In this notebook we review pesticides data and calculate total DDT residues.
+
+# Load Libraries
+```{r load_libraries}
+library(tidyverse)
+library(readxl)
+library(htmltools)  # used by knitr called here only to avoid startup text later
+library(knitr)
+```
+
+# Load Data
+## Establish Folder Reference
+```{r folder_refs}
+auntfldnm <- 'Original_Data'
+parent   <- dirname(getwd())
+grandparent <- dirname(parent)
+aunt  <- file.path(grandparent,auntfldnm)
+fn <- 'CascoBaySWATtissue_Bohlen.xlsx'
+```
+
+## Copy Data
+This is a larger data file that takes some time to load.  Getting the column
+types right dramatically improves load speed. Much of the data is qualitative,
+and can't be handled in R.
+```{r copy_data}
+SWAT_data <- read_excel(file.path(aunt, fn), 
+    sheet = "Mussels Data", col_types = c("numeric", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "date", "text", "text", 
+        "text", "date", "text", "numeric", 
+        "text", "text", "text", "text", 
+        "text", "numeric", "numeric", "text", 
+        "text", "text", "text", "text", 
+        "text", "numeric", "text", 
+        "text", "text", "text", "text", 
+        "text", "text", "text"))
+before <- nrow(SWAT_data)
+```
+
+## Remove duplicates
+Many samples -- nearly 20% -- are members of a group of duplicates.  We can
+think of no valid reason why two records should be exact duplicates in this
+setting, so we remove all duplicates using the unique() function.
+```{r remove_duplicates}
+SWAT_data <- unique(SWAT_data)
+```
+
+## Simplify Data and Add Unique Sample Codes
+This logic was developed in "SWAT_data examination_UNIQUE.Rmd".
+```{r}
+SWAT_simplified <- SWAT_data %>%
+  # Eliminate uninformative identifiers
+  select    (-`SAMPLE TYPE`, -`SAMPLE POINT TYPE`, -`SAMPLE LOCATION`,
+             -`RESULT TYPE`, -`PARAMETER_QUALIFIER`, -`PARAMETER FILTERED`,
+             -`SAMPLE FILTER`, -`DEPTH`, -`DEPTH UNITS`,
+             -TREATMENT, -`METER_CALIBRATED`) %>%
+  
+  # Eliminate data we will not analyze
+  select    (-SITE_DESCRIPTION, -ANALYSIS_DATE,
+             -`QC TYPE`, -SAMPLED_BY, -`UNITS DESCRIPTION`,
+             -`SAMPLE COMMENT`, -`LAB COMMENT`, -`VALIDATION COMMENT`) %>%
+  
+  # Create Site Code and Site Name
+  mutate    (SiteCode =  sub('.* - ','', `EGAD_SITE_NAME`), 
+             Site     =  sub(' - .*','', `EGAD_SITE_NAME`)) %>%
+  select    (-EGAD_SITE_NAME) %>%
+  
+  # Create Year Time Stamp and (Draft 1) Unique Sample ID
+  mutate    (Year  = as.numeric(format(SAMPLE_DATE, '%Y')),
+             sample_id = gsub(" ", "_", SAMPLE_ID)) %>%
+  group_by  (Year) %>%
+  mutate    (tag = as.numeric(factor(SAMPLE_DATE))) %>%
+  ungroup   ()  %>%
+  mutate    (Code = paste(sample_id, Year, tag, sep = '_')) %>%
+  select    (-sample_id, -tag) %>%
+  select    (`SITE SEQ`, SiteCode, Site, Year, SAMPLE_DATE,
+              SAMPLE_ID, Code, everything())
+```
+
+## Add Class to the Working Data
+We can then read in the resulting Excel File to provide groupings...
+```{r}
+Parameter_List <- read_excel(file.path(parent,"Parameter List.xlsx"), 
+    sheet = "Parameter List") %>%
+  mutate(Class = factor(Class)) %>%
+  arrange(Class, PARAMETER)
+
+SWAT_simplified <- SWAT_simplified %>% 
+  mutate(Class = Parameter_List$Class[match(PARAMETER, Parameter_List$PARAMETER)])
+```
+
+# Calculate DDT Residues
+We can pull the DDT, DDE, and DDD parameters as follows.  Once we identify these
+records, we can calculate totals and add them to the data set for further
+analysis.
+```{r}
+SWAT_simplified %>%
+  filter(grepl('DD[TDE]', PARAMETER)) %>%
+  select(PARAMETER) %>%
+  unique()
+```
+
+
+```{r}
+SWAT_simplified %>%
+  filter(grepl('DD[TDE]', PARAMETER))
+
+```
+
+
+We have non-detects reported in these data, so we do  need to
+deal with them. 
+
+Although we prefer to calculate ND estimates based on statistical methods,
+we can not recalculate all the other totals in these data, because of
+inconsistencies in how they were reported. We have to rely on the calculated
+total by DEP staff, which reported totals treating ND as zero, half the
+Reporting Limit (RL), or equal to the RL.
+
+Of those three options, we arbitrarily use the option that non-detects are
+replaced with one half of the detection limits.  Accordingly, when we have
+non-detects, we replace values with one half of the reporting limit.
+
+We also have multiple values for many of these samples. These are values
+reported on WET WEIGHT, DRY WEIGHT, and LIPID WEIGHT basis.  We do not want to
+average or sum across those values.  We focus only on the DRY WEIGHT basis
+results.
+
+```{r}
+ddt_data <- SWAT_simplified %>%
+  # Filter to DDT residues, dry weight only
+  filter(grepl('DD[TDE]', PARAMETER)) %>%
+  filter(`WEIGHT BASIS` == 'DRY') %>%
+  
+  # Calculate concentrations, addressing NDs
+  mutate(conc = if_else(is.na(`LAB QUALIFIER`), CONCENTRATION,
+                        if_else(`LAB QUALIFIER` == 'U' ,
+                                RL/2,
+                                CONCENTRATION))) %>%
+  # Calculate sums across parameters
+  group_by(SAMPLE_ID, SAMPLE_DATE, ANALYSIS_LAB_SAMPLE_ID) %>%
+  summarize(number = sum(! is.na(conc)),
+            conc = sum(conc, na.rm = TRUE),
+            Parameter = 'Total DDT')
+```

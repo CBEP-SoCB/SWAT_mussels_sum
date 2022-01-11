@@ -1,0 +1,29 @@
+Col_Name,Description
+site_seq,EGAD sequence number for designated SITE.
+sitecode,Alphanumeric code for a specific SITE.
+site,Name or description of SITE.
+year,Year of sample collection.
+sample_date,Date of sample collection.
+sample_id,Original EGAD sample ID -- NOT unique.
+code,"Derived, lengthy alphanumaric code for individual sampling events."
+samp_pt_name,EGAD sample point name. NOT unique. Possibly unique within sites.
+lab,Laboratory conducting analyses.
+lab_id,Internal laboratory sample ID number.
+method,Alphanumeric code for specific laboratory method.
+method_name,Name of method.
+parameter,Name of chemical or physical parameter.
+concentration,"Value of the parameter.  Usually, but not always a concentration."
+units,Abbreviation of the units used.  Most are SI units of concentration.
+lab_qualifier,Laboratory data qualifier. Sometimes caries non-detect flags missing in the next QUALIFIER.
+qualifier,EGAD's `VALIDATION QUALIFIER`.  This is usually a subset of the `LABORATORY QUALIFIER`.
+qual_description,Long description of meaning of Validation qualifiers.  Includes some other qualifiers.
+rl,Reporting Limit.  Lab-determined value below which results are non-detects.
+mdl,Method Detection Limit.  Official limit of method.  Usually much lower than Reporting Limit.
+weight_basis,"Basis for calculating concentration (wet weight, dry weight or lipid weight)."
+prep_method,Alphanumeric code for sample preparation methods.
+dilution_factor,Dilution factor for sample analysis.  It's not clear whether this is useful.
+cas_no,Chemical Abstract Number for chemical compound or mixture.
+conc_ugg,"Concentrations, expressed in micrograms per gram (or parts per million)."
+conc_ngg,"Concentrations expressed in nanograms per gram (or parts per billion),"
+rl_ugg,"Reporting limits, expressed in micrograms per gram (or parts per million)."
+rl_ngg,"Reporting limits expressed in nanograms per gram (or parts per billion),"
