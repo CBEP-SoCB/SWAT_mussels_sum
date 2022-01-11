@@ -1,0 +1,42 @@
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+
+# User-specific files
+.Ruserdata
+
+# RStudio files
+.Rproj.user/
+
+# knitr and R markdown default cache directories
+*_cache/
+/cache/
+# Not clear if this  is needed -- older format for nested files
+**/*_cache    
+
+# Temporary files created by R markdown
+*.utf8.md
+*.knit.md
+
+# R Environment Variables
+.Renviron
+
+# Git hosts markdown directly, so do not want the .html version of support docs
+README.html
+Derived_Data/DATA_NOTES.html
+Original_Data/DATA_SOURCES.html
+
+# Folders used to hide content from GIT
+**/drafts/
+**/sources/
+**/testing/
+**/omitfromgit/
+
+# Non-essential ArcGIS File
+**/GIS_FIles.idb/
+Derived_Data/imperviousness_map.mxd
+.Rproj.user
+
