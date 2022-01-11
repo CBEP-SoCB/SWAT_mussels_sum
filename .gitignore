@@ -34,6 +34,7 @@ Original_Data/DATA_SOURCES.html
 **/sources/
 **/testing/
 **/omitfromgit/
+**/Data_Examination/
 
 # Non-essential ArcGIS File
 **/GIS_FIles.idb/
