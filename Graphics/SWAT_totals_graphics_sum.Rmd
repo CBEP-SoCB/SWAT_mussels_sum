@@ -6,8 +6,8 @@ output:
   github_document:
     toc: true
     toc_depth: 2
-    fig_width: 7
-    fig_height: 5
+    fig_width: 5
+    fig_height: 4
 ---
 
 <img
@@ -54,7 +54,7 @@ library(LCensMeans)
 # Load Data
 ## Establish Folder References
 ```{r folder_refs}
-sibfldnm <- 'Derived_Data'
+sibfldnm <- 'Data'
 parent   <- dirname(getwd())
 sibling  <- file.path(parent,sibfldnm)
 fn <- 'SWAT_totals_working.csv'
@@ -122,13 +122,15 @@ references <- read_excel(file.path(sibling,"Parameter List.xlsx"),
 
 ## Load Location Information
 And add a short location name for figures.
-```{r  load_locations}
+
+```{r}
 locations <- read_csv(file.path(sibling,"sites_spatial.csv"), 
     col_types = cols(SITESEQ = col_skip(), 
         LAT = col_skip(), LONG = col_skip())) %>%
+  filter (! is.na(SITE)) %>%  # drops unnamed sites
 
   mutate(short_locs= c("Back Bay",
-                      "Fore River",
+                      "Outer Fore River",
                       "Cocktail Cove",
                       "SW Great Diamond",
                       "Navy Pier",
@@ -147,6 +149,14 @@ locations <- read_csv(file.path(sibling,"sites_spatial.csv"),
                       "Inner Fore",
                       "Quahog Bay",
                       "Long Island"))
+
+swat_totals <- swat_totals %>%
+  mutate(short_locs = locations$short_locs[match(sitecode,
+                                                 locations$SITECODE)]) %>%
+  mutate(short_locs = factor(short_locs,
+                             levels = c('Navy Pier', 'Mare Brook', 'Mill Creek',
+                                        'East End', 'Spring Point')))
+#rm(locations)
 ```
 
 ### Add Short Location Names
@@ -156,68 +166,12 @@ swat_totals <- swat_totals %>%
   mutate(short_locs = locations$short_locs[match(sitecode, locations$SITECODE)])
 ```
 
-# Functions to add Reference Annotations
-By isolating the code for adding annotations, we can redesign the annotations 
-once, and have it percolate through all graphics.  This could be
-generalized by adding dots... to pass through to the underlying functions.
-
-## Utilities to Extract Axis Ranges
-These functions do not properly account for multiple plots due to faceting, but
-they work for simple plots.  It is curious that the ranges, which must be
-useful for modifying plots in many settings, are buried so deeply in a complex
-data structure, and not exposed through the API.
-```{r utility_fxn_axis_ranges}
-get_xrange <- function(p) {
-  ggp <- ggplot_build(p)
-  return(ggp$layout$panel_params[[1]]$x.range)
-}
-  
-get_yrange <- function(p) {
-  ggp <- ggplot_build(p)
-  return(ggp$layout$panel_params[[1]]$y.range)
-}
-```
-
-## Function for Adding Annotations
-The following function positions annotations at 2.5% of the x range from the
-left edge. That positioning could be relegate to a parameter.  This function
-could be generalized by handling dots, but it's not clear whether the dots
-should be directed to the lines or to the text annotations.
-```{r utility_fxn_ad_annot}
-add_refs <- function(plt, parm = 'PAH40', whch = c(1:4), sz = 3) {
-  plt2 <- plt
-  # Extract x range and calculate annotation position
-  xrng <- get_xrange(plt2)
-  xpos <- xrng[1] + 0.025*(xrng[2]-xrng[1])
-  
-  # Draw the Reference Lines
-  for (refline in (1:4)) {
-      if (refline %in% whch){
-        plt2 <- plt2 + 
-        geom_hline(yintercept = references[[parm]][refline],
-                   color = cbep_colors2()[1],
-                   lwd = 0.5, lty = 2)
-      }
-  }
-  
-  # Draw the Associated Text Annotations
-  labs = references[whch,]
-  plt2 <- plt2 + 
-  geom_text(data = labs,
-            aes(x = xpos, y = .data[[parm]], label = Reference_ngg),
-            hjust = 0,
-            size = sz,
-            nudge_y = .03)
-  
-  return(plt2)
-  }
-```
-
 #  PAHs
 We focus on PAH 40, since it matches a national and regional benchmark, and
 approximates total PAHs fairly well. The sum is highly correlated with total
 PAHs, and amounts to about 75 or 80 percent of the total.  Our primary interest
 here to compare observations to benchmarks.
+
 ## Create working data
 ```{r working_pah_data}
 pah_data <- swat_totals %>%
@@ -262,16 +216,30 @@ plt <- pah_recent_data %>%
   theme_cbep(base_size = 12)  +
   ylab('Sum of 40 PAHs (ng/g)') +
   xlab('')
-plt
 ```
+
 ### Add Annotations
 ```{r pah_add_annotations, fig.width = 5, fig.height = 4}
-add_refs(plt, parm = 'PAH40', whch = c(2,4), sz = 3)
+plt +
+  geom_hline(yintercept = 1674, lty = 2,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  geom_hline(yintercept = 618, lty = 1,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  
+  annotate('text', x = 0.5, y = 1800, label = 'National',
+            hjust = 0,
+            size = 3) +
+
+  annotate('text', x = 0.5, y = 670, label = 'Gulf of Maine',
+            hjust = 0,
+            size = 3)
 ggsave('figures/pah_40_recent.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
 
 ## Trend Graphic
-```{r pah_trend_grpahic, fig.width = 5, fig.height = 4}
+```{r pah_trend_graphic, fig.width = 6, fig.height = 4}
 plt <- pah_trend_data %>%
   filter(parameter == 'pah40') %>%
   
@@ -289,16 +257,28 @@ plt <- pah_trend_data %>%
   scale_color_manual(values = cbep_colors()) +
   scale_x_continuous(labels = scales::label_number(accuracy = 1)) +
   
-  ylab('Sum of 40 PAHs (ng/g)') +
+  ylab('PAHs (ng/g)') +
   xlab('Year')
-plt
-ggsave('figures/pah_40_trend.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
 
-### Add Annotations (Unused)
-```{r pah_trend_add_annotations, fig.width = 5, fig.height = 4}
-add_refs(plt, parm = 'PAH40', whch = c(2,4))
-ggsave('figures/pah_40_trend_w_refs.pdf', device = cairo_pdf, width = 5, height = 4)
+```{r pah_trend_graphic_annot, fig.width = 6, fig.height = 4}
+plt +
+  geom_hline(yintercept = 1674, lty = 2,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  geom_hline(yintercept = 618, lty = 1,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  
+  annotate('text', x = 2009, y = 1800, label = 'National',
+            hjust = 0,
+            size = 3) +
+
+  annotate('text', x = 2009, y = 670, label = 'Gulf of Maine',
+            hjust = 0,
+            size = 3)
+
+ggsave('figures/pah_40_trend.pdf', device = cairo_pdf, width = 6, height = 4)
 ```
 
 # PCBs
@@ -316,7 +296,7 @@ pcb_trend_data <- pcb_data %>%
 ```
 
 ## Recent Conditions Dotplot
-```{r pcb_graphic, fig.width = 5, fig.height = 4}
+```{r pcb_graphic, fig.width = 6, fig.height = 4}
 plt <- pcb_recent_data %>%
   filter(parameter == 'swat_pcbs') %>%
   
@@ -336,14 +316,27 @@ plt <- pcb_recent_data %>%
   theme_cbep(base_size = 12)  +
   ylab('SWAT PCBs (ng/g)') +
   xlab('')
+plt
 ```
 
 ```{r pcb_add_annotations, fig.width = 5, fig.height = 4}
-add_refs(plt, parm = 'PCB21', whch = c(2,4), sz = 3)
+plt +
+  geom_hline(yintercept = 141, lty = 2,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  geom_hline(yintercept = 35.4, lty = 1,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  
+  annotate('text', x = 0.5, y = 160, label = 'National',
+            hjust = 0,
+            size = 3) +
+
+  annotate('text', x = 0.5, y = 40, label = 'Gulf of Maine',
+            hjust = 0,
+            size = 3)
 ggsave('figures/swat_pcbs_recent.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
-
-
 
 ## Trend Graphic (Unused)
 ```{r pcb_trend}
@@ -363,7 +356,25 @@ plt <- pcb_trend_data %>%
   
   ylab('SWAT PCBs (ng/g)') +
   xlab('Year')
-plt
+```
+
+```{r pcb_trend_add_annotations, fig.width = 6, fig.height = 4}
+plt +
+  geom_hline(yintercept = 141, lty = 2,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  geom_hline(yintercept = 35.4, lty = 1,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  
+  annotate('text', x = 2009, y = 160, label = 'National',
+            hjust = 0,
+            size = 3) +
+
+  annotate('text', x = 2009, y = 40, label = 'Gulf of Maine',
+            hjust = 0,
+            size = 3)
+ggsave('figures/swat_pcbs_trend.pdf', device = cairo_pdf, width = 6, height = 4)
 ```
 
 # Combined Graphic
@@ -401,7 +412,7 @@ combo_refs <- references %>%
 ## Recent Conditions Dotplot
 ```{r combo_graphic, fig.width = 5, fig.height = 4}
 # Establish named labels
-  labs <- c('Benchmark PAHs', 'Benchmark PCBs')
+  labs <- c('PAHs', 'PCBs')
   names(labs) <- c("pah40", "swat_pcbs")
   
 plt <- combo_data %>%
@@ -428,17 +439,15 @@ plt <- combo_data %>%
         legend.position = 'none') +
   ylab('Concentration (ng/g)') +
   xlab('')
-plt
 ```
 
 ## Add Annotations
 ```{r combo_add_annotations, fig.width = 5, fig.height = 4}
 plt +
   geom_hline(data = combo_refs, 
-             aes(yintercept = value),
+             aes(yintercept = value, lty = alt_ref),
              color = cbep_colors2()[1],
-             lwd = 0.5,
-             lty = 2) +
+             lwd = 0.5) +
   
   
   geom_text(data = combo_refs, 
@@ -449,5 +458,4 @@ plt +
 
 ggsave('figures/combo_recent.pdf', device = cairo_pdf, width = 5, height = 4)  
 ```
-
 

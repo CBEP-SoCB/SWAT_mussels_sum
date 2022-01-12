@@ -15,7 +15,6 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
     -   [Load Location Information](#load-location-information)
 -   [Data Since 2010](#data-since-2010)
     -   [Recents Graphic](#recents-graphic)
-    -   [Means and Standard Errors](#means-and-standard-errors)
 -   [Trend Analyses](#trend-analyses)
     -   [Trend Graphic](#trend-graphic)
     -   [Results Table](#results-table)
@@ -100,12 +99,12 @@ results of these analyses.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
 
-    ## v ggplot2 3.3.3     v purrr   0.3.4
-    ## v tibble  3.0.5     v dplyr   1.0.3
-    ## v tidyr   1.1.2     v stringr 1.4.0
-    ## v readr   1.4.0     v forcats 0.5.0
+    ## v ggplot2 3.3.5     v purrr   0.3.4
+    ## v tibble  3.1.6     v dplyr   1.0.7
+    ## v tidyr   1.1.4     v stringr 1.4.0
+    ## v readr   2.1.1     v forcats 0.5.1
 
     ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
@@ -153,7 +152,7 @@ convert_caps <- function(x_vec) {
 ## Establish Folder References
 
 ``` r
-sibfldnm <- 'Derived_Data'
+sibfldnm <- 'Data'
 parent   <- dirname(getwd())
 sibling  <- file.path(parent,sibfldnm)
 fn <- 'SWAT_metals_working.csv'
@@ -257,12 +256,13 @@ ref_long <- references %>%
 
 ## Load Location Information
 
-And add a short location names for figures.
+And add a short location name for figures.
 
 ``` r
 locations <- read_csv(file.path(sibling,"sites_spatial.csv"), 
     col_types = cols(SITESEQ = col_skip(), 
         LAT = col_skip(), LONG = col_skip())) %>%
+  filter (! is.na(SITE)) %>%  # drops unnamed sites
 
   mutate(short_locs= c("Back Bay",
                       "Outer Fore River",
@@ -284,14 +284,14 @@ locations <- read_csv(file.path(sibling,"sites_spatial.csv"),
                       "Inner Fore",
                       "Quahog Bay",
                       "Long Island"))
-  
+
 swat_metals <- swat_metals %>%
   mutate(short_locs = locations$short_locs[match(sitecode,
                                                  locations$SITECODE)]) %>%
   mutate(short_locs = factor(short_locs,
                              levels = c('Navy Pier', 'Mare Brook', 'Mill Creek',
                                         'East End', 'Spring Point')))
-rm(locations)
+#rm(locations)
 ```
 
 # Data Since 2010
@@ -317,7 +317,7 @@ plt <- ggplot(recent_data,
   
   
   facet_wrap(~parameter, scale="free_y") +
-  ylab(expression("Concentration (" ~ mu ~ "g/g)")) +
+  ylab(expression("Concentration (" *mu *"g/g)")) +
   xlab('') +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
   theme(legend.position = 'bottom',
@@ -334,49 +334,13 @@ plt +
 
     ## Warning: Removed 4 rows containing missing values (geom_hline).
 
-![](SWAT_metals_graphics_files/figure-gfm/recent_add_refs-1.png)<!-- -->
+![](SWAT_metals_graphics_sum_files/figure-gfm/recent_add_refs-1.png)<!-- -->
 
 ``` r
  ggsave('figures/metals_parameters.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
 
     ## Warning: Removed 4 rows containing missing values (geom_hline).
-
-## Means and Standard Errors
-
-``` r
-plt <- recent_data %>%
-  ggplot(aes(short_locs, conc_ML)) +
-  stat_summary(fun.data=mean_sdl, fun.args = list(mult=1), 
-        geom="pointrange", color=cbep_colors()[1]) +
-  facet_wrap(~parameter, scale="free_y") +
-  
-  scale_y_log10() +
-  ylab(expression("Concentration (" ~ mu ~ "g/g)")) +
-  xlab('') + 
-  
-  theme_cbep(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
-  theme(legend.position = 'bottom',
-        legend.title = element_blank(),
-        panel.border = element_rect(color = 'gray', fill = NA, size = 0.25))
-```
-
-``` r
-plt +
-  geom_hline(mapping = aes(yintercept = value,
-                 lty = short_ref, color = short_ref),
-             data = ref_long ) +
- scale_color_manual(values = cbep_colors2())
-```
-
-    ## Warning: Removed 4 rows containing missing values (geom_hline).
-
-![](SWAT_metals_graphics_files/figure-gfm/recent_means_add_refs-1.png)<!-- -->
-
-``` r
- #ggsave('figures/metals_parameters_means.pdf', device = cairo_pdf, width = 7, height = 5)
-```
 
 # Trend Analyses
 
@@ -396,15 +360,15 @@ trend_data <- swat_metals %>%
 plt <- trend_data %>%
   
   ggplot(aes(year, conc_HALF)) +
-  geom_point(aes(color = short_locs), size = 3, alpha = .5) +
+  geom_point(aes(color = short_locs), alpha = .5) +
   
   geom_smooth(aes(color = short_locs), method = 'lm', se = FALSE) +
   facet_wrap(~parameter, scale="free_y") +
   
   scale_y_log10() +
   scale_x_continuous(breaks = c(2006, 2008, 2010, 2012, 2014, 2016)) +
-  scale_color_manual(values = cbep_colors2()) +
-  ylab(expression("Concentration (" ~ mu ~ "g/g)")) +
+  scale_color_manual(values = cbep_colors()) +
+  ylab(expression("Concentration (" *mu *"g/g)")) +
   xlab('') + 
   
   theme_cbep(base_size = 12) +
@@ -417,7 +381,7 @@ plt
 
     ## `geom_smooth()` using formula 'y ~ x'
 
-![](SWAT_metals_graphics_files/figure-gfm/trend_graphic-1.png)<!-- -->
+![](SWAT_metals_graphics_sum_files/figure-gfm/trend_graphic-1.png)<!-- -->
 
 ## Results Table
 

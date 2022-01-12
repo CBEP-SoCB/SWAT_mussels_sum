@@ -118,7 +118,7 @@ convert_caps <- function(x_vec) {
 # Load Data
 ## Establish Folder References
 ```{r folder_refs}
-sibfldnm <- 'Derived_Data'
+sibfldnm <- 'Data'
 parent   <- dirname(getwd())
 sibling  <- file.path(parent,sibfldnm)
 fn <- 'SWAT_metals_working.csv'
@@ -214,11 +214,13 @@ ref_long <- references %>%
 ```
 
 ## Load Location Information
-And add a short location names for figures.
-```{r location_info}
+And add a short location name for figures.
+
+```{r}
 locations <- read_csv(file.path(sibling,"sites_spatial.csv"), 
     col_types = cols(SITESEQ = col_skip(), 
         LAT = col_skip(), LONG = col_skip())) %>%
+  filter (! is.na(SITE)) %>%  # drops unnamed sites
 
   mutate(short_locs= c("Back Bay",
                       "Outer Fore River",
@@ -240,14 +242,14 @@ locations <- read_csv(file.path(sibling,"sites_spatial.csv"),
                       "Inner Fore",
                       "Quahog Bay",
                       "Long Island"))
-  
+
 swat_metals <- swat_metals %>%
   mutate(short_locs = locations$short_locs[match(sitecode,
                                                  locations$SITECODE)]) %>%
   mutate(short_locs = factor(short_locs,
                              levels = c('Navy Pier', 'Mare Brook', 'Mill Creek',
                                         'East End', 'Spring Point')))
-rm(locations)
+#rm(locations)
 ```
 
 # Data Since 2010
@@ -270,7 +272,7 @@ plt <- ggplot(recent_data,
   
   
   facet_wrap(~parameter, scale="free_y") +
-  ylab(expression("Concentration (" ~ mu ~ "g/g)")) +
+  ylab(expression("Concentration (" *mu *"g/g)")) +
   xlab('') +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
   theme(legend.position = 'bottom',
@@ -284,34 +286,6 @@ plt +
              data = ref_long ) +
  scale_color_manual(values = cbep_colors2())
  ggsave('figures/metals_parameters.pdf', device = cairo_pdf, width = 7, height = 5)
-```
-
-## Means and Standard Errors
-```{r recent_means}
-plt <- recent_data %>%
-  ggplot(aes(short_locs, conc_ML)) +
-  stat_summary(fun.data=mean_sdl, fun.args = list(mult=1), 
-        geom="pointrange", color=cbep_colors()[1]) +
-  facet_wrap(~parameter, scale="free_y") +
-  
-  scale_y_log10() +
-  ylab(expression("Concentration (" ~ mu ~ "g/g)")) +
-  xlab('') + 
-  
-  theme_cbep(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.25, hjust = 1)) +
-  theme(legend.position = 'bottom',
-        legend.title = element_blank(),
-        panel.border = element_rect(color = 'gray', fill = NA, size = 0.25))
-```
-
-```{r recent_means_add_refs, fig.width = 7, fig.height = 5}
-plt +
-  geom_hline(mapping = aes(yintercept = value,
-                 lty = short_ref, color = short_ref),
-             data = ref_long ) +
- scale_color_manual(values = cbep_colors2())
- #ggsave('figures/metals_parameters_means.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
 
 # Trend Analyses
@@ -332,15 +306,15 @@ trend_data <- swat_metals %>%
 plt <- trend_data %>%
   
   ggplot(aes(year, conc_HALF)) +
-  geom_point(aes(color = short_locs), size = 3, alpha = .5) +
+  geom_point(aes(color = short_locs), alpha = .5) +
   
   geom_smooth(aes(color = short_locs), method = 'lm', se = FALSE) +
   facet_wrap(~parameter, scale="free_y") +
   
   scale_y_log10() +
   scale_x_continuous(breaks = c(2006, 2008, 2010, 2012, 2014, 2016)) +
-  scale_color_manual(values = cbep_colors2()) +
-  ylab(expression("Concentration (" ~ mu ~ "g/g)")) +
+  scale_color_manual(values = cbep_colors()) +
+  ylab(expression("Concentration (" *mu *"g/g)")) +
   xlab('') + 
   
   theme_cbep(base_size = 12) +

@@ -10,24 +10,19 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
     -   [Copy Data](#copy-data)
     -   [Load Reference Values](#load-reference-values)
     -   [Load Location Information](#load-location-information)
--   [Functions to add Reference
-    Annotations](#functions-to-add-reference-annotations)
-    -   [Utilities to Extract Axis
-        Ranges](#utilities-to-extract-axis-ranges)
-    -   [Function for Adding
-        Annotations](#function-for-adding-annotations)
 -   [PAHs](#pahs)
+    -   [Create working data](#create-working-data)
     -   [Recent Conditions Dotplot
         Graphic](#recent-conditions-dotplot-graphic)
     -   [Trend Graphic](#trend-graphic)
 -   [PCBs](#pcbs)
-    -   [Create Working Data](#create-working-data)
+    -   [Create Working Data](#create-working-data-1)
     -   [Recent Conditions Dotplot](#recent-conditions-dotplot)
     -   [Trend Graphic (Unused)](#trend-graphic-unused)
 -   [Combined Graphic](#combined-graphic)
     -   [Create Combo Data](#create-combo-data)
     -   [Recent Conditions Dotplot](#recent-conditions-dotplot-1)
-    -   [Add Annotations](#add-annotations)
+    -   [Add Annotations](#add-annotations-1)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -66,12 +61,12 @@ folder.
 library(tidyverse)
 ```
 
-    ## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
 
-    ## v ggplot2 3.3.3     v purrr   0.3.4
-    ## v tibble  3.0.5     v dplyr   1.0.3
-    ## v tidyr   1.1.2     v stringr 1.4.0
-    ## v readr   1.4.0     v forcats 0.5.0
+    ## v ggplot2 3.3.5     v purrr   0.3.4
+    ## v tibble  3.1.6     v dplyr   1.0.7
+    ## v tidyr   1.1.4     v stringr 1.4.0
+    ## v readr   2.1.1     v forcats 0.5.1
 
     ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
@@ -92,7 +87,7 @@ library(LCensMeans)
 ## Establish Folder References
 
 ``` r
-sibfldnm <- 'Derived_Data'
+sibfldnm <- 'Data'
 parent   <- dirname(getwd())
 sibling  <- file.path(parent,sibfldnm)
 fn <- 'SWAT_totals_working.csv'
@@ -177,9 +172,10 @@ And add a short location name for figures.
 locations <- read_csv(file.path(sibling,"sites_spatial.csv"), 
     col_types = cols(SITESEQ = col_skip(), 
         LAT = col_skip(), LONG = col_skip())) %>%
+  filter (! is.na(SITE)) %>%  # drops unnamed sites
 
   mutate(short_locs= c("Back Bay",
-                      "Fore River",
+                      "Outer Fore River",
                       "Cocktail Cove",
                       "SW Great Diamond",
                       "Navy Pier",
@@ -198,6 +194,14 @@ locations <- read_csv(file.path(sibling,"sites_spatial.csv"),
                       "Inner Fore",
                       "Quahog Bay",
                       "Long Island"))
+
+swat_totals <- swat_totals %>%
+  mutate(short_locs = locations$short_locs[match(sitecode,
+                                                 locations$SITECODE)]) %>%
+  mutate(short_locs = factor(short_locs,
+                             levels = c('Navy Pier', 'Mare Brook', 'Mill Creek',
+                                        'East End', 'Spring Point')))
+#rm(locations)
 ```
 
 ### Add Short Location Names
@@ -209,77 +213,14 @@ swat_totals <- swat_totals %>%
   mutate(short_locs = locations$short_locs[match(sitecode, locations$SITECODE)])
 ```
 
-# Functions to add Reference Annotations
-
-By isolating the code for adding annotations, we can redesign the
-annotations once, and have it percolate through all graphics. This could
-be generalized by adding dots… to pass through to the underlying
-functions.
-
-## Utilities to Extract Axis Ranges
-
-These functions do not properly account for multiple plots due to
-faceting, but they work for simple plots. It is curious that the ranges,
-which must be useful for modifying plots in many settings, are buried so
-deeply in a complex data structure, and not exposed through the API.
-
-``` r
-get_xrange <- function(p) {
-  ggp <- ggplot_build(p)
-  return(ggp$layout$panel_params[[1]]$x.range)
-}
-  
-get_yrange <- function(p) {
-  ggp <- ggplot_build(p)
-  return(ggp$layout$panel_params[[1]]$y.range)
-}
-```
-
-## Function for Adding Annotations
-
-The following function positions annotations at 2.5% of the x range from
-the left edge. That positioning could be relegate to a parameter. This
-function could be generalized by handling dots, but it’s not clear
-whether the dots should be directed to the lines or to the text
-annotations.
-
-``` r
-add_refs <- function(plt, parm = 'PAH40', whch = c(1:4), sz = 3) {
-  plt2 <- plt
-  # Extract x range and calculate annotation position
-  xrng <- get_xrange(plt2)
-  xpos <- xrng[1] + 0.025*(xrng[2]-xrng[1])
-  
-  # Draw the Reference Lines
-  for (refline in (1:4)) {
-      if (refline %in% whch){
-        plt2 <- plt2 + 
-        geom_hline(yintercept = references[[parm]][refline],
-                   color = cbep_colors2()[1],
-                   lwd = 0.5, lty = 2)
-      }
-  }
-  
-  # Draw the Associated Text Annotations
-  labs = references[whch,]
-  plt2 <- plt2 + 
-  geom_text(data = labs,
-            aes(x = xpos, y = .data[[parm]], label = Reference_ngg),
-            hjust = 0,
-            size = sz,
-            nudge_y = .03)
-  
-  return(plt2)
-  }
-```
-
 # PAHs
 
 We focus on PAH 40, since it matches a national and regional benchmark,
 and approximates total PAHs fairly well. The sum is highly correlated
 with total PAHs, and amounts to about 75 or 80 percent of the total. Our
-primary interest here to compare observations to benchmarks. \#\# Create
-working data
+primary interest here to compare observations to benchmarks.
+
+## Create working data
 
 ``` r
 pah_data <- swat_totals %>%
@@ -326,28 +267,37 @@ plt <- pah_recent_data %>%
   theme_cbep(base_size = 12)  +
   ylab('Sum of 40 PAHs (ng/g)') +
   xlab('')
-plt
 ```
 
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
-
-![](SWAT_totals_graphics_files/figure-gfm/pah_graphic-1.png)<!-- -->
-\#\#\# Add Annotations
+### Add Annotations
 
 ``` r
-add_refs(plt, parm = 'PAH40', whch = c(2,4), sz = 3)
+plt +
+  geom_hline(yintercept = 1674, lty = 2,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  geom_hline(yintercept = 618, lty = 1,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  
+  annotate('text', x = 0.5, y = 1800, label = 'National',
+            hjust = 0,
+            size = 3) +
+
+  annotate('text', x = 0.5, y = 670, label = 'Gulf of Maine',
+            hjust = 0,
+            size = 3)
 ```
 
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
 
-![](SWAT_totals_graphics_files/figure-gfm/pah_add_annotations-1.png)<!-- -->
+![](SWAT_totals_graphics_sum_files/figure-gfm/pah_add_annotations-1.png)<!-- -->
 
 ``` r
 ggsave('figures/pah_40_recent.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
 
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
 
 ## Trend Graphic
 
@@ -369,27 +319,32 @@ plt <- pah_trend_data %>%
   scale_color_manual(values = cbep_colors()) +
   scale_x_continuous(labels = scales::label_number(accuracy = 1)) +
   
-  ylab('Sum of 40 PAHs (ng/g)') +
+  ylab('PAHs (ng/g)') +
   xlab('Year')
-plt
 ```
 
-![](SWAT_totals_graphics_files/figure-gfm/pah_trend_grpahic-1.png)<!-- -->
-
 ``` r
-ggsave('figures/pah_40_trend.pdf', device = cairo_pdf, width = 5, height = 4)
+plt +
+  geom_hline(yintercept = 1674, lty = 2,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  geom_hline(yintercept = 618, lty = 1,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  
+  annotate('text', x = 2009, y = 1800, label = 'National',
+            hjust = 0,
+            size = 3) +
+
+  annotate('text', x = 2009, y = 670, label = 'Gulf of Maine',
+            hjust = 0,
+            size = 3)
 ```
 
-### Add Annotations (Unused)
+![](SWAT_totals_graphics_sum_files/figure-gfm/pah_trend_graphic_annot-1.png)<!-- -->
 
 ``` r
-add_refs(plt, parm = 'PAH40', whch = c(2,4))
-```
-
-![](SWAT_totals_graphics_files/figure-gfm/pah_trend_add_annotations-1.png)<!-- -->
-
-``` r
-ggsave('figures/pah_40_trend_w_refs.pdf', device = cairo_pdf, width = 5, height = 4)
+ggsave('figures/pah_40_trend.pdf', device = cairo_pdf, width = 6, height = 4)
 ```
 
 # PCBs
@@ -430,22 +385,40 @@ plt <- pcb_recent_data %>%
   theme_cbep(base_size = 12)  +
   ylab('SWAT PCBs (ng/g)') +
   xlab('')
+plt
 ```
+
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
+
+![](SWAT_totals_graphics_sum_files/figure-gfm/pcb_graphic-1.png)<!-- -->
 
 ``` r
-add_refs(plt, parm = 'PCB21', whch = c(2,4), sz = 3)
+plt +
+  geom_hline(yintercept = 141, lty = 2,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  geom_hline(yintercept = 35.4, lty = 1,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  
+  annotate('text', x = 0.5, y = 160, label = 'National',
+            hjust = 0,
+            size = 3) +
+
+  annotate('text', x = 0.5, y = 40, label = 'Gulf of Maine',
+            hjust = 0,
+            size = 3)
 ```
 
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
 
-![](SWAT_totals_graphics_files/figure-gfm/pcb_add_annotations-1.png)<!-- -->
+![](SWAT_totals_graphics_sum_files/figure-gfm/pcb_add_annotations-1.png)<!-- -->
 
 ``` r
 ggsave('figures/swat_pcbs_recent.pdf', device = cairo_pdf, width = 5, height = 4)
 ```
 
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
 
 ## Trend Graphic (Unused)
 
@@ -466,12 +439,35 @@ plt <- pcb_trend_data %>%
   
   ylab('SWAT PCBs (ng/g)') +
   xlab('Year')
-plt
+```
+
+``` r
+plt +
+  geom_hline(yintercept = 141, lty = 2,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  geom_hline(yintercept = 35.4, lty = 1,
+             color = cbep_colors2()[1],
+             lwd = 0.5) +
+  
+  annotate('text', x = 2009, y = 160, label = 'National',
+            hjust = 0,
+            size = 3) +
+
+  annotate('text', x = 2009, y = 40, label = 'Gulf of Maine',
+            hjust = 0,
+            size = 3)
 ```
 
     ## `geom_smooth()` using formula 'y ~ x'
 
-![](SWAT_totals_graphics_files/figure-gfm/pcb_trend-1.png)<!-- -->
+![](SWAT_totals_graphics_sum_files/figure-gfm/pcb_trend_add_annotations-1.png)<!-- -->
+
+``` r
+ggsave('figures/swat_pcbs_trend.pdf', device = cairo_pdf, width = 6, height = 4)
+```
+
+    ## `geom_smooth()` using formula 'y ~ x'
 
 # Combined Graphic
 
@@ -512,7 +508,7 @@ combo_refs <- references %>%
 
 ``` r
 # Establish named labels
-  labs <- c('Benchmark PAHs', 'Benchmark PCBs')
+  labs <- c('PAHs', 'PCBs')
   names(labs) <- c("pah40", "swat_pcbs")
   
 plt <- combo_data %>%
@@ -539,22 +535,16 @@ plt <- combo_data %>%
         legend.position = 'none') +
   ylab('Concentration (ng/g)') +
   xlab('')
-plt
 ```
-
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
-
-![](SWAT_totals_graphics_files/figure-gfm/combo_graphic-1.png)<!-- -->
 
 ## Add Annotations
 
 ``` r
 plt +
   geom_hline(data = combo_refs, 
-             aes(yintercept = value),
+             aes(yintercept = value, lty = alt_ref),
              color = cbep_colors2()[1],
-             lwd = 0.5,
-             lty = 2) +
+             lwd = 0.5) +
   
   
   geom_text(data = combo_refs, 
@@ -564,12 +554,12 @@ plt +
             nudge_y = .05)
 ```
 
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
 
-![](SWAT_totals_graphics_files/figure-gfm/combo_add_annotations-1.png)<!-- -->
+![](SWAT_totals_graphics_sum_files/figure-gfm/combo_add_annotations-1.png)<!-- -->
 
 ``` r
 ggsave('figures/combo_recent.pdf', device = cairo_pdf, width = 5, height = 4)  
 ```
 
-    ## `stat_bindot()` using `bins = 30`. Pick better value with `binwidth`.
+    ## Bin width defaults to 1/30 of the range of the data. Pick better value with `binwidth`.
