@@ -1,4 +1,4 @@
-# SWAT_Mussles
+# SWAT_Mussels
 
 <img
     src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -6,6 +6,11 @@
 
 Analysis of data on tissue concentrations of toxics from Maine's Surface Water
 Ambient Toxics program.
+
+Data is from DEP's long-running program sampling tissue of various shellfish for
+concentrations of selected persistent toxic chemicals, including metals, PCBs,
+PAHs, and certain pesticides.  Our abalysis focuses on concetratins of toxic
+contaminants in blue mussels (*Mytilus edulis*).
 
 # Statement of Purpose
 CBEP is committed to the ideal of open science.  Our State of the Bay data
