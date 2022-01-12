@@ -65,37 +65,52 @@ LONG_        | Longitude, WGS 1984, decimal degrees
 RASTERVALU   | Amount of impervious cover within 500m, in square meters
 pct_imperv   | Percent impervious cover within 500 meters
 
-## Toxics Data
 
-Column Name  | Contents                                        | Units
--------------|-------------------------------------------------|----------
-site_seq     | 
-sitecode
-site
-year
-sample_date
-sample_id
-code
-samp_pt_name
-lab
-lab_id
-method
-method_name
-parameter
-concentration
-units
-lab_qualifier
-qualifier
-qual_description
-rl
-mdl
-prep_method
-dilution_factor
-cas_no
-conc_ugg
-rl_ugg
-flag
-conc_RL
-conc_HALF
-conc_ML
+## Toxics Data  
+### `SWAT_metals_working.csv`
+Contains data on concentrations of different metals in blue mussel tissues.
+
+### `swat_totals_working.csv`
+Includes data on several sums of organic contaminants in blue mussel tissue.
+
+#### Data Format
+Both files follow (roughly) the same data format, except that working
+concentrations for metals are in micrgrams per gram dry weight, while 
+
+
+Column Name   | Description
+--------------|-----------------------------------------------------------
+site_seq      | EGAD sequence number for designated SITE.
+sitecode      | Alphanumeric code for a specific SITE.
+site          | Name or description of SITE.
+year          | Year of sample collection.  Four digit integer.
+sample_date   | Date of sample collection.yyyy-mm-ddT00:00:00
+sample_id     | Original EGAD sample ID -- NOT unique.
+code          | Derived, lengthy alphanumaric code for individual sampling events.
+samp_pt_name  | EGAD sample point name. NOT unique. Possibly unique within sites.
+lab           | Laboratory conducting analyses.
+lab_id        | Internal laboratory sample ID number.
+method        | Alphanumeric code for specific laboratory method.
+method_name   | Name of method.
+parameter     | Name of chemical or physical parameter.
+concentration | Value of the parameter.  Usually, but not always a concentration.
+units         | Abbreviation of the units used.  Most are SI units of concentration.
+lab_qualifier | Laboratory data qualifier. Sometimes caries non-detect flags missing in the next QUALIFIER.
+qualifier     | EGAD's `VALIDATION QUALIFIER`.  This is usually a subset of the `LABORATORY QUALIFIER`.
+qual_description | Long description of meaning of Validation qualifiers.  Includes some other qualifiers.
+rl            | Reporting Limit.  Lab-determined value below which results are non-detects.
+mdl           | Method Detection Limit.  Official limit of method.  Usually lower than Reporting Limit.
+weight_basis  | Basis for calculating concentration (wet weight, dry weight or lipid weight).
+prep_method   | Alphanumeric code for sample preparation methods.
+dilution_factor | Dilution factor for sample analysis.  It's not clear whether this is useful.
+cas_no        | Chemical Abstract Number for chemical compound or mixture.
+conc_ugg      | (metals only) Concentrations, expressed in micrograms per gram (or parts per million).
+conc_ngg      | (organics only) Concentrations expressed in nanograms per gram (or parts per billion),
+rl_ugg        | (metals only) Reporting limits, expressed in micrograms per gram (or parts per million).
+rl_ngg        | (organics only) Reporting limits expressed in nanograms per gram (or parts per billion),
+flag	        | Flag indicating a "non-detect"
+conc_RL	     | Concentrations data with non-detects replaced by reporting limits
+conc_HALF	  | Concentrations data with non-detects replaced by half the reporting limits
+conc_ML       | Concentrations data with non-detects replaced by a maximum likelihood estimate of expected value of non-detects based on a longnormal density.
+
 
