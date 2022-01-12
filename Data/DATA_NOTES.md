@@ -70,7 +70,7 @@ pct_imperv   | Percent impervious cover within 500 meters
 ### `SWAT_metals_working.csv`
 Contains data on concentrations of different metals in blue mussel tissues.
 
-### `swat_totals_working.csv`
+### `SWAT_totals_working.csv`
 Includes data on several sums of organic contaminants in blue mussel tissue.
 
 #### Data Format
@@ -113,4 +113,43 @@ conc_RL	     | Concentrations data with non-detects replaced by reporting limits
 conc_HALF	  | Concentrations data with non-detects replaced by half the reporting limits
 conc_ML       | Concentrations data with non-detects replaced by a maximum likelihood estimate of expected value of non-detects based on a longnormal density.
 
+## Reference Levels
+Maine DEP compares values of analytic totals to prevalence benchmarks (medians
+and 85th percentiles) derived from the Gulfwatch and National Status And trends
+monitoring programs, as published by Leblanc et al. 2009.
 
+> Leblanc, L.A., Krahforst, C.F., Aubé, J., Roach, S., Brun, G., Harding, G.,
+  Hennigar, P., Page, D., Jones, S., Shaw, S., Stahlnecker, J., Schwartz, J.,
+  Taylor, D., Thorpe, B., & Wells, P. (2009).  Eighteenth Year of the Gulf of
+  Maine Environmental Monitoring Program.
+
+We copied benchmark tables from (an on-line version of) Leblanc et al. 2009 into
+our excel spreadsheet, and read those benchmarks in here.
+
+That document also refers to "MCDC Fish Tissue Action Levels." and FDA Action
+Levels. After some digging, we found a document on the Maine CDC website that
+corresponds to (most or all of) the FTALs reported by DEP.
+
+**ALL HEALTH_RELATED THRESHOLDS ARE EXPRESSED ON A WET WEIGHT BASIS**
+
+>  Maine Center for Disease Control. 2001.  Bureau of Health Fish Tissue Action
+   Levels. 
+   https://www.maine.gov/dhhs/mecdc/environmental-health/eohp/fish/documents/action-levels-writeup.pdf. 
+   Accessed 11/10/2020.
+
+
+### `Parameter List.xlsx`
+This Excel file contains Four Tabs:
+
+1.  "Metals Comparisons" - Potential reference levels for metals, in micrograms 
+    per gram dry weight.
+    
+2.  "Organic Comparisons" - Potential reference levels for total of organic
+    contaminants, in nanograms per gram dry weight.
+    
+3.  "PCB Nomenclature" - A crosswalk between ways of referring to PCBs (here for 
+    convenience only).
+
+
+the Reference levels just described, along with a 
+table that indicates 
